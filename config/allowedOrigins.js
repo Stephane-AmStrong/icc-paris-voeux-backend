@@ -1,3 +1,3 @@
-const allowedOrigins = ["https://ICC Paris Centre.onrender.com"];
+const allowedOrigins = ["https://icc-paris-voeux.onrender.com"];
 
 module.exports = allowedOrigins;
