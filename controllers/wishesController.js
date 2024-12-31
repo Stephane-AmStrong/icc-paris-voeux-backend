@@ -65,6 +65,61 @@ const createWish = async (req, res) => {
   }
 };
 
+// @desc Create new wish With PDF
+// @route POST /wishes
+// @access Private
+const createWishAndReturnPDF = async (req, res) => {
+  const {
+    spiritually,
+    familiallyRelationally,
+    financiallyMaterially,
+    professionallyAcademically,
+    email,
+    other,
+  } = req.body;
+
+  const validationError = validateData({
+    spiritually,
+    familiallyRelationally,
+    financiallyMaterially,
+    professionallyAcademically,
+    other,
+    email,
+  });
+
+  if (validationError) {
+    return res
+      .status(validationError.status)
+      .json({ message: validationError.message });
+  }
+
+  // Check for duplicate title
+  const duplicate = await Wish.findOne({ email }).lean().exec();
+
+  if (duplicate) {
+    return res.status(409).json({
+      message: `Le mail "${email}" existe déjà veuillez utiliser un autre`,
+    });
+  }
+
+  // Create and store the new user
+  const wish = await Wish.create({
+    spiritually,
+    familiallyRelationally,
+    financiallyMaterially,
+    professionallyAcademically,
+    email,
+    other,
+  });
+
+  if (wish) {
+    // Created
+    return res.status(201).json(wish);
+  } else {
+    return res.status(400).json({ message: "Invalid wish data received" });
+  }
+};
+
 // @desc Update a wish
 // @route PATCH /wishes
 // @access Private

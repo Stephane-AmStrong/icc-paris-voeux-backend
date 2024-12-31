@@ -12,8 +12,6 @@ const connectDB = require("./config/dbConn");
 const mongoose = require("mongoose");
 const PORT = process.env.PORT || 3500;
 
-console.log(process.env.NODE_ENV);
-
 connectDB();
 
 app.use(logger);
@@ -28,6 +26,7 @@ app.use("/", express.static(path.join(__dirname, "public")));
 
 app.use("/", require("./routes/root"));
 app.use("/wishes", require("./routes/wishRoutes"));
+app.use("/pdf", require("./routes/pdfRoutes"));
 
 app.all("*", (req, res) => {
   res.status(404);
