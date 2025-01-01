@@ -4,7 +4,7 @@
   "description": "ICC Paris Centre MERN Project",
   "main": "server.js",
   "scripts": {
-    "start": "sh ./render-build.sh && node server",
+    "start": "node server",
     "dev": "nodemon server"
   },
   "keywords": [],
