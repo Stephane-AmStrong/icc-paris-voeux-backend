@@ -36,13 +36,13 @@ public sealed class WishesService(
         await wishesRepository.DeleteAsync(wish, cancellationToken);
     }
 
-    public async Task<IList<WishResponse>> GetByQueryParametersAsync(WishQueryParameters queryParameters,CancellationToken cancellationToken)
+    public async Task<PagedListResponse<WishResponse>> GetPagedListByQueryAsync(WishQueryParameters queryParameters,CancellationToken cancellationToken)
     {
-        logger.LogInformation("Getting wishs with query parameters: {@QueryParameters}", queryParameters);
-        var wishs = await wishesRepository.GetByConditionAsync(queryParameters, cancellationToken);
+        logger.LogInformation("Getting wishes with query parameters: {@QueryParameters}", queryParameters);
+        var wishes = await wishesRepository.GetPagedListByQueryAsync(queryParameters, cancellationToken);
 
-        logger.LogInformation("Retrieved {WishCount} wishs", wishs.Count);
-        return wishs.Adapt<IList<WishResponse>>();
+        logger.LogInformation("Retrieved wishes with meta data: {@MetaData}", wishes.MetaData);
+        return wishes.Adapt<PagedListResponse<WishResponse>>();
     }
 
     public async Task<WishResponse?> GetByIdAsync(string id, CancellationToken cancellationToken)
