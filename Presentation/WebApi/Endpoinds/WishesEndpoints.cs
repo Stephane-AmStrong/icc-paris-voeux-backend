@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Application.DataTransfertObjects;
 using Application.Services.Abstractions;
 using WebApi.Extensions;
@@ -33,9 +34,12 @@ public static class WishesEndpoints
     }
 
     // GET /api/wishes
-    private static  async Task<IResult> GetByQueryParameters(IWishesService wishesService,[AsParameters] WishQueryParameters queryParameters, CancellationToken cancellationToken)
+    private static  async Task<IResult> GetByQueryParameters(IWishesService wishesService,[AsParameters] WishQueryParameters queryParameters, HttpResponse response, CancellationToken cancellationToken)
     {
-        var wishesResponse = await wishesService.GetByQueryParametersAsync(queryParameters, cancellationToken);
+        var wishesResponse = await wishesService.GetPagedListByQueryAsync(queryParameters, cancellationToken);
+        
+        response.Headers.Append("X-Pagination", JsonSerializer.Serialize(wishesResponse.MetaData));
+
         return Results.Ok(wishesResponse);
     }
 
