@@ -8,7 +8,7 @@ using MongoDB.Driver;
 
 namespace Persistence.Repository;
 
-public sealed class WishsesRepository(IMongoDatabase database) : RepositoryBase<Wish>(database, "WT_Clients"), IWishesRepository
+public sealed class WishesRepository(IMongoDatabase database) : RepositoryBase<Wish>(database, "Wishes"), IWishesRepository
 {
     public async Task CreateAsync(Wish wish, CancellationToken cancellationToken)
     {

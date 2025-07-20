@@ -50,7 +50,7 @@ public static class ServiceCollectionExtensions
 
     public static void ConfigureRepositories(this IServiceCollection services)
     {
-        services.AddScoped<IWishesRepository, WishsesRepository>();
+        services.AddScoped<IWishesRepository, WishesRepository>();
     }
 
     public static void ConfigureServices(this IServiceCollection services)
