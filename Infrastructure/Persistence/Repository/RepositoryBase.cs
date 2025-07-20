@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Reflection;
 using Domain.Repositories.Abstractions;
 using Domain.Shared.Common;
 using MongoDB.Bson;
@@ -13,7 +14,7 @@ public class RepositoryBase<T> : IRepositoryBase<T> where T : class
     protected RepositoryBase(IMongoDatabase database, string collectionName) => Collection = database.GetCollection<T>(collectionName);
 
 
-    public Task<List<T>> BaseFindByConditionAsync(QueryParameters<T> queryParameters, CancellationToken cancellationToken)
+    public async Task<PagedList<T>> BaseQueryWithFiltersAsync(QueryParameters<T> queryParameters, CancellationToken cancellationToken)
     {
         List<FilterDefinition<T>> filters = [];
 
@@ -43,11 +44,17 @@ public class RepositoryBase<T> : IRepositoryBase<T> where T : class
 
         var find = Collection.Find(filter);
 
-        if (!string.IsNullOrWhiteSpace(queryParameters.OrderBy)) find = find.Sort(Builders<T>.Sort.Ascending(queryParameters.OrderBy));
+        var totalCount = await Collection.CountDocumentsAsync(filter, cancellationToken: cancellationToken);
 
-        find = find.Skip((queryParameters.Page - 1) * queryParameters.PageSize).Limit(queryParameters.PageSize);
+        var sort = BuildSortDefinition(queryParameters.OrderBy);
 
-        return find.ToListAsync(cancellationToken);
+        if (sort != null) find = find.Sort(sort);
+
+        int page = Math.Max(queryParameters.Page ?? 1, 1);
+        int pageSize = Math.Max(queryParameters.PageSize ?? 10, 10);
+        find = find.Skip((page - 1) * pageSize).Limit(pageSize);
+
+        return new PagedList<T>(await find.ToListAsync(cancellationToken), totalCount, page, pageSize);
     }
 
     public Task<List<T>> BaseFindByConditionAsync(Expression<Func<T, bool>> expression, CancellationToken cancellationToken)
@@ -78,12 +85,36 @@ public class RepositoryBase<T> : IRepositoryBase<T> where T : class
         return Collection.DeleteOneAsync(filter, cancellationToken);
     }
 
-    private static string GetPropertyName<TKey>(Expression<Func<T, TKey>> expression)
+    private SortDefinition<T>? BuildSortDefinition(string? orderByQueryString)
     {
-        if (expression.Body is MemberExpression member)
-            return member.Member.Name;
-        if (expression.Body is UnaryExpression unary && unary.Operand is MemberExpression memberOperand)
-            return memberOperand.Member.Name;
-        throw new ArgumentException("Invalid orderBy expression");
+        if (string.IsNullOrWhiteSpace(orderByQueryString))
+            return null;
+
+        var orderParams = orderByQueryString.Trim().Split(',');
+        var propertyInfos = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
+        var sortDefinitions = new List<SortDefinition<T>>();
+
+        foreach (var param in orderParams)
+        {
+            var trimmedParam = param?.Trim();
+            if (string.IsNullOrWhiteSpace(trimmedParam)) continue;
+
+            var parts = trimmedParam.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) continue;
+
+            var propertyFromQueryName = parts[0];
+            var objectProperty = propertyInfos.FirstOrDefault(pi => pi.Name.Equals(propertyFromQueryName, StringComparison.InvariantCultureIgnoreCase));
+
+            if (objectProperty == null) continue;
+
+            var isDescending = trimmedParam.EndsWith(" desc", StringComparison.InvariantCultureIgnoreCase);
+            var sortDef = isDescending
+                ? Builders<T>.Sort.Descending(objectProperty.Name)
+                : Builders<T>.Sort.Ascending(objectProperty.Name);
+
+            sortDefinitions.Add(sortDef);
+        }
+
+        return sortDefinitions.Count > 0 ? Builders<T>.Sort.Combine(sortDefinitions) : null;
     }
 }

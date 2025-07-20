@@ -8,7 +8,7 @@ namespace Domain.Repositories.Abstractions;
 
 public interface IWishesRepository
 {
-    Task<List<Wish>> GetByConditionAsync(QueryParameters<Wish> queryParameters, CancellationToken cancellationToken);
+    Task<PagedList<Wish>> GetPagedListByQueryAsync(QueryParameters<Wish> queryParameters, CancellationToken cancellationToken);
     Task<Wish?> GetByIdAsync(string id, CancellationToken cancellationToken);
     Task CreateAsync(Wish wish, CancellationToken cancellationToken);
     Task UpdateAsync(Wish wish, CancellationToken cancellationToken);

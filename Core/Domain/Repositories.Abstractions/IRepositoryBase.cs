@@ -5,7 +5,7 @@ namespace Domain.Repositories.Abstractions;
 
 public interface IRepositoryBase<T>
 {
-    Task<List<T>> BaseFindByConditionAsync(QueryParameters<T> parameters, CancellationToken cancellationToken);
+    Task<PagedList<T>> BaseQueryWithFiltersAsync(QueryParameters<T> parameters, CancellationToken cancellationToken);
     Task<List<T>> BaseFindByConditionAsync(Expression<Func<T, bool>> expression, CancellationToken cancellationToken);
     Task BaseCreateAsync(T entity, CancellationToken cancellationToken);
     Task BaseUpdateAsync(T entity, CancellationToken cancellationToken);

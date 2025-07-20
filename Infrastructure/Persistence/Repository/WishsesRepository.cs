@@ -31,9 +31,9 @@ public sealed class WishsesRepository(IMongoDatabase database) : RepositoryBase<
         return clients.FirstOrDefault();
     }
 
-    public Task<List<Wish>> GetByConditionAsync(QueryParameters<Wish> queryParameters, CancellationToken cancellationToken)
+    public Task<PagedList<Wish>> GetPagedListByQueryAsync(QueryParameters<Wish> queryParameters, CancellationToken cancellationToken)
     {
-        return BaseFindByConditionAsync(queryParameters, cancellationToken);
+        return BaseQueryWithFiltersAsync(queryParameters, cancellationToken);
     }
 
     public Task UpdateAsync(Wish wish, CancellationToken cancellationToken)
