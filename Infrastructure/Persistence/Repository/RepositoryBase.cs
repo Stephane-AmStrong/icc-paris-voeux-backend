@@ -13,21 +13,22 @@ public class RepositoryBase<T> : IRepositoryBase<T> where T : class
     protected RepositoryBase(IMongoDatabase database, string collectionName) => Collection = database.GetCollection<T>(collectionName);
 
 
-    public Task<List<T>> BaseFindByConditionAsync(QueryParameters<T> parameters, CancellationToken cancellationToken)
+    public Task<List<T>> BaseFindByConditionAsync(QueryParameters<T> queryParameters, CancellationToken cancellationToken)
     {
         List<FilterDefinition<T>> filters = [];
 
         // Add expression filter if any
-        if (parameters.Expression != null) filters.Add(Builders<T>.Filter.Where(parameters.Expression));
+        var filterExpression = queryParameters.GetFilterExpression();
+        if (filterExpression != null) filters.Add(Builders<T>.Filter.Where(filterExpression));
 
         // Add text search filter if any
-        if (!string.IsNullOrWhiteSpace(parameters.SearchTerm))
+        if (!string.IsNullOrWhiteSpace(queryParameters.SearchTerm))
         {
             var stringProps = typeof(T).GetProperties()
                 .Where(p => p.PropertyType == typeof(string));
 
             var regexFilters = stringProps
-                .Select(p => Builders<T>.Filter.Regex(p.Name, new BsonRegularExpression(parameters.SearchTerm, "i")));
+                .Select(p => Builders<T>.Filter.Regex(p.Name, new BsonRegularExpression(queryParameters.SearchTerm, "i")));
 
             filters.AddRange(regexFilters);
         }
@@ -42,9 +43,9 @@ public class RepositoryBase<T> : IRepositoryBase<T> where T : class
 
         var find = Collection.Find(filter);
 
-        if (!string.IsNullOrWhiteSpace(parameters.OrderBy)) find = find.Sort(Builders<T>.Sort.Ascending(parameters.OrderBy));
+        if (!string.IsNullOrWhiteSpace(queryParameters.OrderBy)) find = find.Sort(Builders<T>.Sort.Ascending(queryParameters.OrderBy));
 
-        find = find.Skip((parameters.Page - 1) * parameters.PageSize).Limit(parameters.PageSize);
+        find = find.Skip((queryParameters.Page - 1) * queryParameters.PageSize).Limit(queryParameters.PageSize);
 
         return find.ToListAsync(cancellationToken);
     }

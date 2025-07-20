@@ -10,7 +10,7 @@ public static class WishesEndpoints
         var group = app.MapGroup("/api/wishes")
             .WithTags("Wishes");
 
-        group.MapGet("/", GetAllWishes)
+        group.MapGet("/", GetByQueryParameters)
             .Produces<IList<WishResponse>>(StatusCodes.Status200OK);
 
         group.MapGet("/{id}", GetWishById)
@@ -33,9 +33,9 @@ public static class WishesEndpoints
     }
 
     // GET /api/wishes
-    private static  async Task<IResult> GetAllWishes(IWishesService wishesService, CancellationToken cancellationToken)
+    private static  async Task<IResult> GetByQueryParameters(IWishesService wishesService,[AsParameters] WishQueryParameters queryParameters, CancellationToken cancellationToken)
     {
-        var wishesResponse = await wishesService.GetAllAsync(cancellationToken);
+        var wishesResponse = await wishesService.GetByQueryParametersAsync(queryParameters, cancellationToken);
         return Results.Ok(wishesResponse);
     }
 

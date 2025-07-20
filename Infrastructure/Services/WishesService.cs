@@ -36,10 +36,10 @@ public sealed class WishesService(
         await wishesRepository.DeleteAsync(wish, cancellationToken);
     }
 
-    public async Task<IList<WishResponse>> GetAllAsync(CancellationToken cancellationToken)
+    public async Task<IList<WishResponse>> GetByQueryParametersAsync(WishQueryParameters queryParameters,CancellationToken cancellationToken)
     {
-        logger.LogInformation("Getting all wishs");
-        var wishs = await wishesRepository.GetAllAsync(cancellationToken);
+        logger.LogInformation("Getting wishs with query parameters: {@QueryParameters}", queryParameters);
+        var wishs = await wishesRepository.GetByConditionAsync(queryParameters, cancellationToken);
 
         logger.LogInformation("Retrieved {WishCount} wishs", wishs.Count);
         return wishs.Adapt<IList<WishResponse>>();
