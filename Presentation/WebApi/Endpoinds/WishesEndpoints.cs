@@ -40,7 +40,7 @@ public static class WishesEndpoints
         
         response.Headers.Append("X-Pagination", JsonSerializer.Serialize(wishesResponse.MetaData));
 
-        return Results.Ok(wishesResponse);
+        return Results.Ok(wishesResponse.PagedList);
     }
 
     // GET /api/wishes/{id}

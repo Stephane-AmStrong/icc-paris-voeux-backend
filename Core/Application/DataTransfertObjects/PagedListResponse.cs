@@ -4,6 +4,8 @@ namespace Application.DataTransfertObjects;
 
 public class PagedListResponse<T>(List<T> pagedList, MetaData metaData)
 {
+    public PagedListResponse() : this([], new MetaData()) { }
+
     public MetaData MetaData { get; set; } = new()
     {
         TotalCount = metaData.TotalCount,
