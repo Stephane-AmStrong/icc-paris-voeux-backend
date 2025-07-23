@@ -1,8 +1,14 @@
 ﻿using System.Text.Json.Serialization;
 using Application.Services.Abstractions;
+using Application.UseCases.Wishes.Create;
+using Application.UseCases.Wishes.Update;
+using Domain.Entities;
 using Domain.Repositories.Abstractions;
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi.Models;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.IdGenerators;
 using MongoDB.Driver;
 using Persistence.Repository;
 using Services;
@@ -12,18 +18,14 @@ namespace WebApi.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    public static void ConfigureCors(this IServiceCollection services)
+    public static void ConfigureCors(this IServiceCollection services, IConfiguration configuration)
     {
+        string[] allowedOrigins = configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>() ?? [];
         services.AddCors(options =>
         {
             options.AddPolicy("CorsPolicy", builder =>
             {
-                builder.WithOrigins(
-                    "http://localhost:4200",
-                    "https://localhost:4200",
-                    "http://localhost:5173",
-                    "https://localhost:5173"
-                )
+                builder.WithOrigins(allowedOrigins)
                 .AllowAnyHeader()
                 .AllowAnyMethod();
             });
@@ -43,8 +45,15 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped(serviceProvider =>
         {
-            var client = serviceProvider.GetRequiredService<IMongoClient>();
-            return client.GetDatabase(databaseName);
+            var wish = serviceProvider.GetRequiredService<IMongoClient>();
+            return wish.GetDatabase(databaseName);
+        });
+        
+        BsonClassMap.RegisterClassMap<BaseEntity>(cm =>
+        {
+            cm.AutoMap();
+            cm.MapIdMember(c => c.Id)
+                .SetIdGenerator(StringObjectIdGenerator.Instance);
         });
     }
 
@@ -76,6 +85,12 @@ public static class ServiceCollectionExtensions
         });
     }
 
+    public static void ConfigureValidation(this IServiceCollection services)
+    {
+        services.AddValidatorsFromAssemblyContaining<WishCreateValidator>();
+        services.AddValidatorsFromAssemblyContaining<WishUpdateValidator>();
+    }
+    
     public static void ConfigureGlobalExceptionHandling(this IServiceCollection services)
     {
         services.AddScoped<EndpointLoggingMiddleware>();
