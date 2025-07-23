@@ -1,6 +1,6 @@
 ﻿using Application.UseCases.Wishes.Create;
 
-namespace Application.DataTransfertObjects;
+namespace Application.UseCases.Wishes.GetByQuery;
 
 public record WishResponse : WishCreateRequest
 {

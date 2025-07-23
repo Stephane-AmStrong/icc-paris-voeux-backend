@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Application.DataTransfertObjects;
 using Application.Services.Abstractions;
 using Application.UseCases.Wishes.Create;
 using Application.UseCases.Wishes.GetByQuery;
