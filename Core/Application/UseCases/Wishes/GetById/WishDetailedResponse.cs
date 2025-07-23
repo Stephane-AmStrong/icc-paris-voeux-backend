@@ -1,4 +1,4 @@
-﻿using Application.DataTransfertObjects;
+﻿using Application.UseCases.Wishes.GetByQuery;
 
 namespace Application.UseCases.Wishes.GetById;
 

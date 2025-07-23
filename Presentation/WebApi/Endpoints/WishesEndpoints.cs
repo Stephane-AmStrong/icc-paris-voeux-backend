@@ -1,9 +1,12 @@
 using System.Text.Json;
 using Application.DataTransfertObjects;
 using Application.Services.Abstractions;
+using Application.UseCases.Wishes.Create;
+using Application.UseCases.Wishes.GetByQuery;
+using Application.UseCases.Wishes.Update;
 using WebApi.Extensions;
 
-namespace WebApi.Endpoinds;
+namespace WebApi.Endpoints;
 public static class WishesEndpoints
 {
     public static void MapWishesEndpoints(this IEndpointRouteBuilder app)
@@ -34,13 +37,13 @@ public static class WishesEndpoints
     }
 
     // GET /api/wishes
-    private static  async Task<IResult> GetByQueryParameters(IWishesService wishesService,[AsParameters] WishQueryParameters queryParameters, HttpResponse response, CancellationToken cancellationToken)
+    private static  async Task<IResult> GetByQueryParameters(IWishesService wishesService, [AsParameters] WishQuery queryParameters, HttpResponse response, CancellationToken cancellationToken)
     {
         var wishesResponse = await wishesService.GetPagedListByQueryAsync(queryParameters, cancellationToken);
         
         response.Headers.Append("X-Pagination", JsonSerializer.Serialize(wishesResponse.MetaData));
 
-        return Results.Ok(wishesResponse.PagedList);
+        return Results.Ok(wishesResponse);
     }
 
     // GET /api/wishes/{id}
