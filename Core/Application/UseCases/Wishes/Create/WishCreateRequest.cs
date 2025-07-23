@@ -1,8 +1,6 @@
-﻿using System.Text.Json.Serialization;
+﻿namespace Application.UseCases.Wishes.Create;
 
-namespace Application.DataTransfertObjects;
-
-public record WishUpdateRequest
+public record WishCreateRequest
 {
     public string Spiritually { get; init; }
     public string FamiliallyRelationally { get; init; }

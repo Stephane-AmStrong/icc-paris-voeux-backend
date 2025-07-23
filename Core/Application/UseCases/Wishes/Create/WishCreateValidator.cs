@@ -1,12 +1,11 @@
-using Application.DataTransfertObjects;
-using Domain.Repositories.Abstractions;
+﻿using Domain.Repositories.Abstractions;
 using FluentValidation;
 
-namespace WebApi.Validators;
+namespace Application.UseCases.Wishes.Create;
 
-public class WishUpdateValidator : AbstractValidator<WishUpdateRequest>
+public class WishCreateValidator : AbstractValidator<WishCreateRequest>
 {
-    public WishUpdateValidator(IWishesRepository wishesRepository)
+    public WishCreateValidator(IWishesRepository wishesRepository)
     {
         RuleFor(wish => wish)
             .Must(HaveAtLeastOnePropertySet)
@@ -17,12 +16,12 @@ public class WishUpdateValidator : AbstractValidator<WishUpdateRequest>
             .MustAsync(async (wishId, cancellationToken) =>
             {
                 var wish = await wishesRepository.GetByIdAsync(wishId, cancellationToken);
-                return wish != null;
+                return wish == null;
             })
             .WithMessage("Wish  with id '{PropertyValue}' already exist");
     }
 
-    private static bool HaveAtLeastOnePropertySet(WishUpdateRequest request)
+    private static bool HaveAtLeastOnePropertySet(WishCreateRequest request)
     {
         return !string.IsNullOrWhiteSpace(request.Spiritually) || !string.IsNullOrWhiteSpace(request.FamiliallyRelationally) || !string.IsNullOrWhiteSpace(request.FinanciallyMaterially) || !string.IsNullOrWhiteSpace(request.ProfessionallyAcademically) || !string.IsNullOrWhiteSpace(request.Other);
     }
