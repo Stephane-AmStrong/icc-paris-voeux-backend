@@ -5,7 +5,7 @@ using Application.UseCases.Wishes.GetByQuery;
 using Application.UseCases.Wishes.Update;
 using Domain.Shared.Common;
 
-namespace Application.Services.Abstractions;
+namespace Application.Abstractions.Services;
 
 public interface IWishesService
 {

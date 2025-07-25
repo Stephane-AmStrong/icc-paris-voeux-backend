@@ -1,5 +1,5 @@
 ﻿#nullable enable
-using Application.Services.Abstractions;
+using Application.Abstractions.Services;
 using Application.UseCases.Wishes.Create;
 using Application.UseCases.Wishes.GetById;
 using Application.UseCases.Wishes.GetByQuery;
