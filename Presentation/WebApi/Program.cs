@@ -21,6 +21,7 @@ builder.Services.ConfigureSwagger();
 builder.Services.ConfigureMongoDB(builder.Configuration);
 builder.Services.ConfigureRepositories();
 builder.Services.ConfigureServices();
+builder.Services.ConfigureHandlers();
 builder.Services.ConfigureGlobalExceptionHandling();
 
 builder.Services.AddHealthChecks();

@@ -1,6 +1,8 @@
 using System.Text.Json;
-using Application.Services.Abstractions;
+using Application.Abstractions.Handlers;
+using Application.Abstractions.Services;
 using Application.UseCases.Wishes.Create;
+using Application.UseCases.Wishes.Delete;
 using Application.UseCases.Wishes.GetByQuery;
 using Application.UseCases.Wishes.Update;
 using WebApi.Extensions;
@@ -61,9 +63,9 @@ public static class WishesEndpoints
     }
 
     // DELETE /api/wishes/{id}
-    private static async Task<IResult> DeleteWish(IWishesService wishesService, string id, CancellationToken cancellationToken)
+    private static async Task<IResult> DeleteWish(ICommandHandler<DeleteWishCommand> handler, string id, CancellationToken cancellationToken)
     {
-        await wishesService.DeleteAsync(id, cancellationToken);
+        await handler.HandleAsync(new DeleteWishCommand { Id = id }, cancellationToken);
         return Results.NoContent();
     }
 

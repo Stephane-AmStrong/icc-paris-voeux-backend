@@ -1,6 +1,8 @@
 ﻿using System.Text.Json.Serialization;
-using Application.Services.Abstractions;
+using Application.Abstractions.Handlers;
+using Application.Abstractions.Services;
 using Application.UseCases.Wishes.Create;
+using Application.UseCases.Wishes.Delete;
 using Application.UseCases.Wishes.Update;
 using Domain.Entities;
 using Domain.Repositories.Abstractions;
@@ -65,6 +67,11 @@ public static class ServiceCollectionExtensions
     public static void ConfigureServices(this IServiceCollection services)
     {
         services.AddScoped<IWishesService, WishesService>();
+    }
+
+    public static void ConfigureHandlers(this IServiceCollection services)
+    {
+        services.AddScoped<ICommandHandler<DeleteWishCommand>, DeleteWishCommandHandler>();
     }
 
 
