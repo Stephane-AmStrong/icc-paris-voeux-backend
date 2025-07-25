@@ -17,7 +17,8 @@ public static class WishesEndpoints
             .Produces<IList<WishResponse>>(StatusCodes.Status200OK);
 
         group.MapGet("/{id}", GetWishById)
-            .Produces<WishResponse>(StatusCodes.Status200OK);
+            .Produces<WishResponse>(StatusCodes.Status200OK)
+            .WithName(nameof(GetWishById));
 
         group.MapPost("/", CreateWish)
             .WithRequestValidation<WishCreateRequest>()
@@ -56,7 +57,7 @@ public static class WishesEndpoints
     private static async Task<IResult> CreateWish(IWishesService wishesService, WishCreateRequest wishRequest, CancellationToken cancellationToken)
     {
         var wishResponse = await wishesService.CreateAsync(wishRequest, cancellationToken);
-        return Results.Created(wishResponse.Id.ToString(), wishResponse);
+        return Results.CreatedAtRoute(nameof(GetWishById), new { id = wishResponse.Id }, wishResponse);
     }
 
     // DELETE /api/wishes/{id}
