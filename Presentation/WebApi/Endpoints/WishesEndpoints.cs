@@ -3,8 +3,10 @@ using Application.Abstractions.Handlers;
 using Application.Abstractions.Services;
 using Application.UseCases.Wishes.Create;
 using Application.UseCases.Wishes.Delete;
+using Application.UseCases.Wishes.GetById;
 using Application.UseCases.Wishes.GetByQuery;
 using Application.UseCases.Wishes.Update;
+using Domain.Shared.Common;
 using WebApi.Extensions;
 
 namespace WebApi.Endpoints;
@@ -56,9 +58,9 @@ public static class WishesEndpoints
     }
 
     // POST /api/wishes
-    private static async Task<IResult> CreateWish(IWishesService wishesService, WishCreateRequest wishRequest, CancellationToken cancellationToken)
+    private static async Task<IResult> CreateWish(ICommandHandler<CreateWishCommand, WishResponse> handler, WishCreateRequest wishRequest, CancellationToken cancellationToken)
     {
-        var wishResponse = await wishesService.CreateAsync(wishRequest, cancellationToken);
+        var wishResponse = await handler.HandleAsync(new CreateWishCommand(wishRequest), cancellationToken);
         return Results.CreatedAtRoute(nameof(GetWishById), new { id = wishResponse.Id }, wishResponse);
     }
 

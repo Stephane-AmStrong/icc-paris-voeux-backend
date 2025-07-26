@@ -3,9 +3,12 @@ using Application.Abstractions.Handlers;
 using Application.Abstractions.Services;
 using Application.UseCases.Wishes.Create;
 using Application.UseCases.Wishes.Delete;
+using Application.UseCases.Wishes.GetById;
+using Application.UseCases.Wishes.GetByQuery;
 using Application.UseCases.Wishes.Update;
 using Domain.Entities;
 using Domain.Repositories.Abstractions;
+using Domain.Shared.Common;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi.Models;
@@ -71,6 +74,7 @@ public static class ServiceCollectionExtensions
 
     public static void ConfigureHandlers(this IServiceCollection services)
     {
+        services.AddScoped<ICommandHandler<CreateWishCommand, WishResponse>, CreateWishCommandHandler>();
         services.AddScoped<ICommandHandler<DeleteWishCommand>, DeleteWishCommandHandler>();
     }
 

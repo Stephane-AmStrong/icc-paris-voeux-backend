@@ -1,28 +1,27 @@
-﻿using Domain.Repositories.Abstractions;
+﻿using Application.Common;
+using Domain.Repositories.Abstractions;
 using FluentValidation;
 
 namespace Application.UseCases.Wishes.Create;
 
-public class WishCreateValidator : AbstractValidator<WishCreateRequest>
+public class WishCreateValidator : AbstractValidator<CreateWishCommand>
 {
     public WishCreateValidator(IWishesRepository wishesRepository)
     {
-        RuleFor(wish => wish)
-            .Must(HaveAtLeastOnePropertySet)
-            .WithMessage("At least one of the wish properties must be set: Spiritually, FamiliallyRelationally, FinanciallyMaterially, ProfessionallyAcademically, Other");
-            
-        RuleFor(wish => wish.Email)
+        RuleFor(command => command.Payload.Email)
             .NotEmpty()
-            .MustAsync(async (wishId, cancellationToken) =>
+            .WithMessage(Validation.Messages.FieldRequired)
+            .MustAsync(async (email, cancellationToken) =>
             {
-                var wish = await wishesRepository.GetByIdAsync(wishId, cancellationToken);
+                var wish = await wishesRepository.FindByConditionAsync(wish => wish.Email == email, cancellationToken);
                 return wish == null;
             })
-            .WithMessage("Wish  with id '{PropertyValue}' already exist");
+            .WithMessage(string.Format(Validation.Messages.EntityAlreadyExists, Validation.Entities.Wish));
+
+        RuleFor(command => command.Payload)
+            .Must(HaveAtLeastOnePropertySet)
+            .WithMessage(string.Format(Validation.Messages.AtLeastOnePropertyRequired, Validation.Entities.Wish, "Spiritually, FamiliallyRelationally, FinanciallyMaterially, ProfessionallyAcademically, Other"));
     }
 
-    private static bool HaveAtLeastOnePropertySet(WishCreateRequest request)
-    {
-        return !string.IsNullOrWhiteSpace(request.Spiritually) || !string.IsNullOrWhiteSpace(request.FamiliallyRelationally) || !string.IsNullOrWhiteSpace(request.FinanciallyMaterially) || !string.IsNullOrWhiteSpace(request.ProfessionallyAcademically) || !string.IsNullOrWhiteSpace(request.Other);
-    }
+    private static bool HaveAtLeastOnePropertySet(WishCreateRequest wish) => !string.IsNullOrWhiteSpace(wish.Spiritually) || !string.IsNullOrWhiteSpace(wish.FamiliallyRelationally) || !string.IsNullOrWhiteSpace(wish.FinanciallyMaterially) || !string.IsNullOrWhiteSpace(wish.ProfessionallyAcademically) || !string.IsNullOrWhiteSpace(wish.Other);
 }
