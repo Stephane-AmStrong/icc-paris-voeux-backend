@@ -71,9 +71,9 @@ public static class WishesEndpoints
     }
 
     // PUT /api/wishes/{id}
-    private static async Task<IResult> UpdateWish(IWishesService wishesService, string id, WishUpdateRequest wishRequest, CancellationToken cancellationToken)
+    private static async Task<IResult> UpdateWish(ICommandHandler<UpdateWishCommand> handler, string id, WishUpdateRequest wishRequest, CancellationToken cancellationToken)
     {
-        await wishesService.UpdateAsync(id, wishRequest, cancellationToken);
+        await handler.HandleAsync(new UpdateWishCommand(id, wishRequest), cancellationToken);;
         return Results.NoContent();
     }
 }

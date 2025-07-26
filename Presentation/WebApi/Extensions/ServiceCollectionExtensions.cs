@@ -78,6 +78,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IQueryHandler<GetWishByIdQuery, WishDetailedResponse?>, GetWishByIdQueryHandler>();
 
         services.AddScoped<ICommandHandler<CreateWishCommand, WishResponse>, CreateWishCommandHandler>();
+        services.AddScoped<ICommandHandler<UpdateWishCommand>, UpdateWishCommandHandler>();
         services.AddScoped<ICommandHandler<DeleteWishCommand>, DeleteWishCommandHandler>();
     }
 
