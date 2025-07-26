@@ -74,6 +74,9 @@ public static class ServiceCollectionExtensions
 
     public static void ConfigureHandlers(this IServiceCollection services)
     {
+        services.AddScoped<IQueryHandler<GetWishByQuery, PagedList<WishResponse>>, GetWishByQueryHandler>();
+        services.AddScoped<IQueryHandler<GetWishByIdQuery, WishDetailedResponse?>, GetWishByIdQueryHandler>();
+
         services.AddScoped<ICommandHandler<CreateWishCommand, WishResponse>, CreateWishCommandHandler>();
         services.AddScoped<ICommandHandler<DeleteWishCommand>, DeleteWishCommandHandler>();
     }

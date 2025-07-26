@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Application.Abstractions.Handlers;
-using Application.Abstractions.Services;
 using Application.UseCases.Wishes.Create;
 using Application.UseCases.Wishes.Delete;
 using Application.UseCases.Wishes.GetById;
@@ -41,9 +40,9 @@ public static class WishesEndpoints
     }
 
     // GET /api/wishes
-    private static  async Task<IResult> GetByQueryParameters(IWishesService wishesService, [AsParameters] WishQuery queryParameters, HttpResponse response, CancellationToken cancellationToken)
+    private static  async Task<IResult> GetByQueryParameters(IQueryHandler<GetWishByQuery, PagedList<WishResponse>> handler, [AsParameters] WishQuery queryParameters, HttpResponse response, CancellationToken cancellationToken)
     {
-        var wishesResponse = await wishesService.GetPagedListByQueryAsync(queryParameters, cancellationToken);
+        var wishesResponse = await handler.HandleAsync(new GetWishByQuery(queryParameters), cancellationToken);
         
         response.Headers.Append("X-Pagination", JsonSerializer.Serialize(wishesResponse.MetaData));
 
@@ -51,9 +50,9 @@ public static class WishesEndpoints
     }
 
     // GET /api/wishes/{id}
-    private static async Task<IResult> GetWishById(IWishesService wishesService, string id, CancellationToken cancellationToken)
+    private static async Task<IResult> GetWishById(IQueryHandler<GetWishByIdQuery, WishDetailedResponse?> handler, string id, CancellationToken cancellationToken)
     {
-        var wishResponse = await wishesService.GetByIdAsync(id, cancellationToken);
+        var wishResponse = await handler.HandleAsync(new GetWishByIdQuery(id), cancellationToken);
         return Results.Ok(wishResponse);
     }
 
