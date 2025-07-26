@@ -66,7 +66,7 @@ public static class WishesEndpoints
     // DELETE /api/wishes/{id}
     private static async Task<IResult> DeleteWish(ICommandHandler<DeleteWishCommand> handler, string id, CancellationToken cancellationToken)
     {
-        await handler.HandleAsync(new DeleteWishCommand { Id = id }, cancellationToken);
+        await handler.HandleAsync(new DeleteWishCommand(id), cancellationToken);
         return Results.NoContent();
     }
 
