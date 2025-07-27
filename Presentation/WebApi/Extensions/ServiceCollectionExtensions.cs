@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using Application.Abstractions.Behaviors;
 using Application.Abstractions.Handlers;
 using Application.Abstractions.Services;
 using Application.UseCases.Wishes.Create;
@@ -53,7 +54,7 @@ public static class ServiceCollectionExtensions
             var wish = serviceProvider.GetRequiredService<IMongoClient>();
             return wish.GetDatabase(databaseName);
         });
-        
+
         BsonClassMap.RegisterClassMap<BaseEntity>(cm =>
         {
             cm.AutoMap();
@@ -72,14 +73,40 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IWishesService, WishesService>();
     }
 
+    public static void ConfigureValidation(this IServiceCollection services)
+    {
+        services.AddValidatorsFromAssemblyContaining<WishCreateValidator>();
+        services.AddValidatorsFromAssemblyContaining<WishUpdateValidator>();
+    }
+
     public static void ConfigureHandlers(this IServiceCollection services)
     {
         services.AddScoped<IQueryHandler<GetWishByQuery, PagedList<WishResponse>>, GetWishByQueryHandler>();
         services.AddScoped<IQueryHandler<GetWishByIdQuery, WishDetailedResponse?>, GetWishByIdQueryHandler>();
 
-        services.AddScoped<ICommandHandler<CreateWishCommand, WishResponse>, CreateWishCommandHandler>();
-        services.AddScoped<ICommandHandler<UpdateWishCommand>, UpdateWishCommandHandler>();
-        services.AddScoped<ICommandHandler<DeleteWishCommand>, DeleteWishCommandHandler>();
+        services.AddScoped<CreateWishCommandHandler>();
+        services.AddScoped<ICommandHandler<CreateWishCommand, WishResponse>>(provider =>
+        {
+            var handler = provider.GetRequiredService<CreateWishCommandHandler>();
+            var validator = provider.GetRequiredService<IValidator<CreateWishCommand>>();
+            return new ValidationDecorator.CommandHandler<CreateWishCommand, WishResponse>(handler, validator);
+        });
+
+        services.AddScoped<UpdateWishCommandHandler>();
+        services.AddScoped<ICommandHandler<UpdateWishCommand>>(provider =>
+        {
+            var handler = provider.GetRequiredService<UpdateWishCommandHandler>();
+            var validator = provider.GetRequiredService<IValidator<UpdateWishCommand>>();
+            return new ValidationDecorator.CommandBaseHandler<UpdateWishCommand>(handler, validator);
+        });
+
+        services.AddScoped<DeleteWishCommandHandler>();
+        services.AddScoped<ICommandHandler<DeleteWishCommand>>(provider =>
+        {
+            var handler = provider.GetRequiredService<DeleteWishCommandHandler>();
+            var validator = provider.GetRequiredService<IValidator<DeleteWishCommand>>();
+            return new ValidationDecorator.CommandBaseHandler<DeleteWishCommand>(handler, validator);
+        });
     }
 
 
@@ -100,20 +127,9 @@ public static class ServiceCollectionExtensions
         });
     }
 
-    public static void ConfigureValidation(this IServiceCollection services)
-    {
-        services.AddValidatorsFromAssemblyContaining<WishCreateValidator>();
-        services.AddValidatorsFromAssemblyContaining<WishUpdateValidator>();
-    }
-    
     public static void ConfigureGlobalExceptionHandling(this IServiceCollection services)
     {
         services.AddScoped<EndpointLoggingMiddleware>();
         services.AddScoped<ExceptionHandlingMiddleware>();
-    }
-
-    public static RouteHandlerBuilder WithRequestValidation<TRequest>(this RouteHandlerBuilder builder)
-    {
-        return builder.AddEndpointFilter<Filters.ValidationFilter<TRequest>>().ProducesValidationProblem();
     }
 }

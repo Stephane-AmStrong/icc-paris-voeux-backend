@@ -13,7 +13,7 @@ public class WishCreateValidator : AbstractValidator<CreateWishCommand>
             .WithMessage(Validation.Messages.FieldRequired)
             .MustAsync(async (email, cancellationToken) =>
             {
-                var wish = await wishesRepository.FindByConditionAsync(wish => wish.Email == email, cancellationToken);
+                var wish = (await wishesRepository.FindByConditionAsync(wish => wish.Email == email, cancellationToken)).FirstOrDefault();
                 return wish == null;
             })
             .WithMessage(string.Format(Validation.Messages.EntityAlreadyExists, Validation.Entities.Wish));

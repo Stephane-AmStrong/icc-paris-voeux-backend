@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using Application.Common;
 using Domain.Errors;
 
 namespace WebApi.Middleware;
@@ -13,7 +14,7 @@ internal sealed class ExceptionHandlingMiddleware(ILogger<ExceptionHandlingMiddl
         }
         catch (Exception e)
         {
-            logger.LogError(e, "An unhandled exception occurred: {Message}", e.Message);
+            LogException(e);
             await HandleExceptionAsync(context, e);
         }
     }
@@ -29,15 +30,29 @@ internal sealed class ExceptionHandlingMiddleware(ILogger<ExceptionHandlingMiddl
         var (statusCode, message) = GetErrorDetails(exception);
         httpContext.Response.StatusCode = statusCode;
 
-        var response = new
+        object response;
+        if (exception is ValidationError validationEx)
         {
-            Error = new
+            response = new
             {
-                Message = message,
-                Type = exception.GetType().Name,
+                Title = message,
+                Status = statusCode,
+                validationEx.Errors,
                 TraceId = httpContext.TraceIdentifier
-            }
-        };
+            };
+        }
+        else
+        {
+            response = new
+            {
+                Error = new
+                {
+                    Message = message,
+                    Type = exception.GetType().Name,
+                    TraceId = httpContext.TraceIdentifier
+                }
+            };
+        }
 
         var options = new JsonSerializerOptions
         {
@@ -51,11 +66,26 @@ internal sealed class ExceptionHandlingMiddleware(ILogger<ExceptionHandlingMiddl
     {
         return exception switch
         {
+            ValidationError => (StatusCodes.Status400BadRequest, exception.Message),
             BadRequestException => (StatusCodes.Status400BadRequest, exception.Message),
             BadHttpRequestException => (StatusCodes.Status400BadRequest, exception.Message),
             NotFoundException => (StatusCodes.Status404NotFound, exception.Message),
             JsonException => (StatusCodes.Status400BadRequest, "Invalid JSON format"),
             _ => (StatusCodes.Status500InternalServerError, "An internal server error occurred")
         };
+    }
+
+    private void LogException(Exception e)
+    {
+        if (e is ValidationError validationEx)
+        {
+            logger.LogWarning("Validation error: {Errors}",
+                string.Join(", ", validationEx.Errors.SelectMany(err => err.Value.Select(msg => $"[{err.Key}] {msg}")))
+            );
+        }
+        else
+        {
+            logger.LogError(e, "An unhandled exception occurred: {Message}", e.Message);
+        }
     }
 }

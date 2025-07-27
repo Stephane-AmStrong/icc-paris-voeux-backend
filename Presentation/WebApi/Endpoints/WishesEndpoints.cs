@@ -6,7 +6,6 @@ using Application.UseCases.Wishes.GetById;
 using Application.UseCases.Wishes.GetByQuery;
 using Application.UseCases.Wishes.Update;
 using Domain.Shared.Common;
-using WebApi.Extensions;
 
 namespace WebApi.Endpoints;
 public static class WishesEndpoints
@@ -24,7 +23,6 @@ public static class WishesEndpoints
             .WithName(nameof(GetWishById));
 
         group.MapPost("/", CreateWish)
-            .WithRequestValidation<WishCreateRequest>()
             .Produces<WishResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest);
 
@@ -33,7 +31,6 @@ public static class WishesEndpoints
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapPut("/{id}", UpdateWish)
-            .WithRequestValidation<WishUpdateRequest>()
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
