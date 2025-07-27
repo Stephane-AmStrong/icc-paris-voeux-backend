@@ -1,5 +1,7 @@
+#nullable enable
 using System.Linq.Expressions;
 using System.Reflection;
+using Domain.Entities;
 using Domain.Repositories.Abstractions;
 using Domain.Shared.Common;
 using MongoDB.Bson;
@@ -7,14 +9,14 @@ using MongoDB.Driver;
 
 namespace Persistence.Repository;
 
-public class RepositoryBase<T> : IRepositoryBase<T> where T : class
+public class RepositoryBase<T> : IRepositoryBase<T> where T : BaseEntity
 {
     protected IMongoCollection<T> Collection { get; }
 
     protected RepositoryBase(IMongoDatabase database, string collectionName) => Collection = database.GetCollection<T>(collectionName);
 
 
-    public async Task<PagedList<T>> BaseQueryWithFiltersAsync(QueryParameters<T> queryParameters, CancellationToken cancellationToken)
+    public async Task<PagedList<T>> BaseQueryWithFiltersAsync(BaseQueryParameters<T> queryParameters, CancellationToken cancellationToken)
     {
         List<FilterDefinition<T>> filters = [];
 
@@ -31,7 +33,11 @@ public class RepositoryBase<T> : IRepositoryBase<T> where T : class
             var regexFilters = stringProps
                 .Select(p => Builders<T>.Filter.Regex(p.Name, new BsonRegularExpression(queryParameters.SearchTerm, "i")));
 
-            filters.AddRange(regexFilters);
+            if (regexFilters.Any())
+            {
+                var textSearchFilter = Builders<T>.Filter.Or(regexFilters);
+                filters.Add(textSearchFilter);
+            }
         }
 
         // Combine all filters with AND if more than one, otherwise Empty
@@ -50,11 +56,9 @@ public class RepositoryBase<T> : IRepositoryBase<T> where T : class
 
         if (sort != null) find = find.Sort(sort);
 
-        int page = Math.Max(queryParameters.Page ?? 1, 1);
-        int pageSize = Math.Max(queryParameters.PageSize ?? 10, 10);
-        find = find.Skip((page - 1) * pageSize).Limit(pageSize);
+        find = find.Skip((queryParameters.Page - 1) * queryParameters.PageSize).Limit(queryParameters.PageSize);
 
-        return new PagedList<T>(await find.ToListAsync(cancellationToken), totalCount, page, pageSize);
+        return new PagedList<T>(await find.ToListAsync(cancellationToken), totalCount, queryParameters.Page!.Value, queryParameters.PageSize!.Value);
     }
 
     public Task<List<T>> BaseFindByConditionAsync(Expression<Func<T, bool>> expression, CancellationToken cancellationToken)
@@ -69,19 +73,13 @@ public class RepositoryBase<T> : IRepositoryBase<T> where T : class
 
     public Task BaseUpdateAsync(T entity, CancellationToken cancellationToken)
     {
-        var idProperty = typeof(T).GetProperty("Id") ?? throw new InvalidOperationException("The entity must have a property 'Id'.");
-        var idValue = idProperty.GetValue(entity);
-        var filter = Builders<T>.Filter.Eq("Id", idValue);
-
+        var filter = Builders<T>.Filter.Eq(e=> e.Id, entity.Id);
         return Collection.ReplaceOneAsync(filter, entity, cancellationToken: cancellationToken);
     }
 
     public Task BaseDeleteAsync(T entity, CancellationToken cancellationToken)
     {
-        var idProperty = typeof(T).GetProperty("Id") ?? throw new InvalidOperationException("The entity must have a property 'Id'.");
-        var idValue = idProperty.GetValue(entity);
-        var filter = Builders<T>.Filter.Eq("Id", idValue);
-
+        var filter = Builders<T>.Filter.Eq(e=> e.Id, entity.Id);
         return Collection.DeleteOneAsync(filter, cancellationToken);
     }
 

@@ -1,7 +1,7 @@
 using AspNetCore.Swagger.Themes;
 using FluentValidation;
 using Serilog;
-using WebApi.Endpoinds;
+using WebApi.Endpoints;
 using WebApi.Extensions;
 using WebApi.Middleware;
 
@@ -14,12 +14,14 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
     .Enrich.FromLogContext());
 
 // Add services to the container.
-builder.Services.ConfigureCors();
+builder.Services.ConfigureCors(builder.Configuration);
 builder.Services.ConfigureJsonOptions();
+builder.Services.ConfigureValidation();
 builder.Services.ConfigureSwagger();
 builder.Services.ConfigureMongoDB(builder.Configuration);
 builder.Services.ConfigureRepositories();
 builder.Services.ConfigureServices();
+builder.Services.ConfigureHandlers();
 builder.Services.ConfigureGlobalExceptionHandling();
 
 builder.Services.AddHealthChecks();

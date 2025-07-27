@@ -1,8 +1,9 @@
-﻿using System.Linq.Expressions;
+﻿#nullable enable
+using System.Linq.Expressions;
 
 namespace Domain.Shared.Common;
 
-public abstract record QueryParameters<T>
+public abstract record BaseQueryParameters<T>
 {
     private Expression<Func<T, bool>>? _filterExpression { get; set; }
     public int? Page { get; set; } = 1;

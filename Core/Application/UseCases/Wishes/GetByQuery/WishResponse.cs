@@ -1,9 +1,8 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿namespace Application.UseCases.Wishes.GetByQuery;
 
-namespace Domain.Entities;
-
-public class Wish : BaseEntity
+public record WishResponse
 {
+    public string Id { get; init; }
     public string Spiritually { get; init; }
     public string FamiliallyRelationally { get; init; }
     public string FinanciallyMaterially { get; init; }
