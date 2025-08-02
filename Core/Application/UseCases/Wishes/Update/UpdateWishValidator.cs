@@ -4,9 +4,9 @@ using FluentValidation;
 
 namespace Application.UseCases.Wishes.Update;
 
-public class WishUpdateValidator : AbstractValidator<UpdateWishCommand>
+public class UpdateWishValidator : AbstractValidator<UpdateWishCommand>
 {
-    public WishUpdateValidator(IWishesRepository wishesRepository)
+    public UpdateWishValidator(IWishesRepository wishesRepository)
     {
 
         RuleFor(command => command.Id)

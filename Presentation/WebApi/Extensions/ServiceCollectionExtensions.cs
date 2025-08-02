@@ -75,8 +75,9 @@ public static class ServiceCollectionExtensions
 
     public static void ConfigureValidation(this IServiceCollection services)
     {
-        services.AddValidatorsFromAssemblyContaining<WishCreateValidator>();
-        services.AddValidatorsFromAssemblyContaining<WishUpdateValidator>();
+        services.AddScoped<IValidator<CreateWishCommand>, CreateWishValidator>();
+        services.AddScoped<IValidator<UpdateWishCommand>, UpdateWishValidator>();
+        services.AddScoped<IValidator<DeleteWishCommand>, DeleteWishValidator>();
     }
 
     public static void ConfigureHandlers(this IServiceCollection services)
@@ -84,29 +85,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IQueryHandler<GetWishByQuery, PagedList<WishResponse>>, GetWishByQueryHandler>();
         services.AddScoped<IQueryHandler<GetWishByIdQuery, WishDetailedResponse?>, GetWishByIdQueryHandler>();
 
-        services.AddScoped<CreateWishCommandHandler>();
-        services.AddScoped<ICommandHandler<CreateWishCommand, WishResponse>>(provider =>
-        {
-            var handler = provider.GetRequiredService<CreateWishCommandHandler>();
-            var validator = provider.GetRequiredService<IValidator<CreateWishCommand>>();
-            return new ValidationDecorator.CommandHandler<CreateWishCommand, WishResponse>(handler, validator);
-        });
-
-        services.AddScoped<UpdateWishCommandHandler>();
-        services.AddScoped<ICommandHandler<UpdateWishCommand>>(provider =>
-        {
-            var handler = provider.GetRequiredService<UpdateWishCommandHandler>();
-            var validator = provider.GetRequiredService<IValidator<UpdateWishCommand>>();
-            return new ValidationDecorator.CommandBaseHandler<UpdateWishCommand>(handler, validator);
-        });
-
-        services.AddScoped<DeleteWishCommandHandler>();
-        services.AddScoped<ICommandHandler<DeleteWishCommand>>(provider =>
-        {
-            var handler = provider.GetRequiredService<DeleteWishCommandHandler>();
-            var validator = provider.GetRequiredService<IValidator<DeleteWishCommand>>();
-            return new ValidationDecorator.CommandBaseHandler<DeleteWishCommand>(handler, validator);
-        });
+        services.AddCommandWithValidation<CreateWishCommand, CreateWishCommandHandler, IValidator<CreateWishCommand>, WishResponse>();
+        services.AddCommandWithValidation<UpdateWishCommand, UpdateWishCommandHandler, IValidator<UpdateWishCommand>>();
+        services.AddCommandWithValidation<DeleteWishCommand, DeleteWishCommandHandler, IValidator<DeleteWishCommand>>();
     }
 
 

@@ -4,9 +4,9 @@ using FluentValidation;
 
 namespace Application.UseCases.Wishes.Create;
 
-public class WishCreateValidator : AbstractValidator<CreateWishCommand>
+public class CreateWishValidator : AbstractValidator<CreateWishCommand>
 {
-    public WishCreateValidator(IWishesRepository wishesRepository)
+    public CreateWishValidator(IWishesRepository wishesRepository)
     {
         RuleFor(command => command.Payload.Email)
             .NotEmpty()

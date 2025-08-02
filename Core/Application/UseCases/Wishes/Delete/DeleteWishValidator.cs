@@ -4,9 +4,9 @@ using FluentValidation;
 
 namespace Application.UseCases.Wishes.Delete;
 
-public class WishDeleteValidator : AbstractValidator<DeleteWishCommand>
+public class DeleteWishValidator : AbstractValidator<DeleteWishCommand>
 {
-    public WishDeleteValidator(IWishesRepository wishesRepository)
+    public DeleteWishValidator(IWishesRepository wishesRepository)
     {
         RuleFor(command => command.Id)
             .NotEmpty()
