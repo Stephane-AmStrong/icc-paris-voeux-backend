@@ -1,0 +1,44 @@
+{
+  "Serilog": {
+    "Using": [ "Serilog.Sinks.Console" ],
+    "Enrich": [ "FromLogContext", "WithDemystifiedStackTraces", "WithMachineName", "WithProcessId", "WithThreadId", "WithThreadName" ],
+    "MinimumLevel": {
+      "Default": "Debug",
+      "Override": {
+        "Microsoft": "Debug",
+        "System": "Debug"
+      }
+    },
+    "WriteTo": [
+      {
+        "Name": "Async",
+        "Args": {
+          "configure": [
+            {
+              "Name": "Console",
+              "Args": {
+                "restrictedToMinimumLevel": "Information",
+                "outputTemplate": "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [ENV:{Environment}] [{ThreadId}] [{ThreadName}] [{Level:u3}] [sc:{SourceContext}] {Message:lj}{NewLine}{Exception}{EventType}"
+              }
+            },
+            {
+              "Name": "File",
+              "Args": {
+                "path": "logs/ICCParis.log",
+                "outputTemplate": "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [ENV:{Environment}] [{ThreadId}] [{ThreadName}] [{Level:u3}] [sc:{SourceContext}] {Message:lj}{NewLine}{Exception}{EventType}",
+                "rollingInterval": "Day",
+                "retainedFileCountLimit": 10,
+                "rollOnFileSizeLimit": true,
+                "fileSizeLimitBytes": 250000000
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "Properties": {
+      "Environment": "DEV",
+      "Application": "ICCParis API"
+    }
+  }
+}

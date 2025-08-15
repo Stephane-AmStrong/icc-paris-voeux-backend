@@ -1,0 +1,6 @@
+{
+    "ConnectionStrings": {
+        "MongoDB": "mongodb+srv://stephane-adjakotan:nYvpr0Ex295ccxm0@cluster0.rwzfy.mongodb.net/techNotesDB?retryWrites=true&w=majority&appName=Cluster0",
+        "DatabaseName": "ICCParis"
+    }
+}
