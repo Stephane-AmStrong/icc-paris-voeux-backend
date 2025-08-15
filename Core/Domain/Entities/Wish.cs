@@ -1,13 +1,14 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+#nullable enable
 
 namespace Domain.Entities;
 
-public class Wish : BaseEntity
+public record Wish : IBaseEntity
 {
-    public string Spiritually { get; init; }
-    public string FamiliallyRelationally { get; init; }
-    public string FinanciallyMaterially { get; init; }
-    public string ProfessionallyAcademically { get; init; }
-    public string Other { get; init; }
-    public string Email { get; init; }
+    public required string Id { get; init; }
+    public required string Title { get; set; }
+    public required string Description { get; set; }
+    public required string Type { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? FulfilledAt { get; set; }
+    public required string UserId { get; init; }
 }
