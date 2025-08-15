@@ -1,6 +1,10 @@
 {
     "Serilog": {
-        "Using": ["Serilog.Sinks.Console", "Serilog.Sinks.File"],
+        "Using": [
+            "Serilog.Sinks.Console",
+            "Serilog.Sinks.File",
+            "Serilog.Sinks.Async"
+        ],
         "MinimumLevel": {
             "Default": "Information",
             "Override": {
@@ -12,18 +16,25 @@
         },
         "WriteTo": [
             {
-                "Name": "Console",
+                "Name": "Async",
                 "Args": {
-                    "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}"
-                }
-            },
-            {
-                "Name": "File",
-                "Args": {
-                    "path": "logs/log-.log",
-                    "rollingInterval": "Day",
-                    "retainedFileCountLimit": 7,
-                    "outputTemplate": "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}"
+                    "configure": [
+                        {
+                            "Name": "Console",
+                            "Args": {
+                                "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}"
+                            }
+                        },
+                        {
+                            "Name": "File",
+                            "Args": {
+                                "path": "logs/log-.log",
+                                "rollingInterval": "Day",
+                                "retainedFileCountLimit": 7,
+                                "outputTemplate": "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}"
+                            }
+                        }
+                    ]
                 }
             }
         ],
