@@ -1,27 +1,26 @@
-﻿#nullable enable
+#nullable enable
 using Domain.Entities;
 using Domain.Shared.Common;
+using DataTransfertObjects.QueryParameters;
 
 namespace Application.UseCases.Wishes.GetByQuery;
 
-public record WishQuery : BaseQueryParameters<Wish>
+public record WishQuery : BaseQuery<Wish>
 {
-
-    public string? WithEmail { get; set; }
-    public string? WithSpiritually { get; set; }
-
-    public WishQuery(string? withEmail, string? withSpiritually, string? searchTerm, string? orderBy, int? page, int? pageSize)
+    public WishQuery(WishQueryParameters queryParameters) : base(queryParameters.SearchTerm, queryParameters.OrderBy, queryParameters.Page, queryParameters.PageSize)
     {
-        WithEmail = withEmail;
-        WithSpiritually = withSpiritually;
-        SearchTerm = searchTerm;
-        OrderBy = orderBy;
-        Page = page ?? 1;
-        PageSize = pageSize;
-        
-        if (WithEmail != null || WithSpiritually != null)
+        if (!string.IsNullOrWhiteSpace(queryParameters.WithUserId) || (!string.IsNullOrWhiteSpace(queryParameters.WithTitle) || queryParameters.OfType is not null || queryParameters.CreatedBefore is not null || queryParameters.CreatedAfter is not null || queryParameters.FulfilledBefore is not null || queryParameters.FulfilledAfter is not null))
         {
-            SetFilterExpression(wish => (WithEmail == null || wish.Email == WithEmail) && (WithSpiritually == null || wish.Spiritually == WithSpiritually));
+            SetFilterExpression
+            (
+                wish => (string.IsNullOrWhiteSpace(queryParameters.WithUserId) || wish.UserId == queryParameters.WithUserId) &&
+                        (string.IsNullOrWhiteSpace(queryParameters.WithTitle) || wish.Title == queryParameters.WithTitle) &&
+                        (queryParameters.OfType == null || wish.Type == queryParameters.OfType.ToString()) &&
+                        (queryParameters.CreatedBefore == null || wish.CreatedAt < queryParameters.CreatedBefore) &&
+                        (queryParameters.CreatedAfter == null || wish.CreatedAt >= queryParameters.CreatedAfter) &&
+                        (queryParameters.FulfilledBefore == null || wish.FulfilledAt < queryParameters.FulfilledBefore) &&
+                        (queryParameters.FulfilledAfter == null || wish.FulfilledAt >= queryParameters.FulfilledAfter)
+            );
         }
     }
 }

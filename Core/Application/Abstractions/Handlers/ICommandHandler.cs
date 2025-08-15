@@ -1,6 +1,7 @@
-﻿namespace Application.Abstractions.Handlers;
+namespace Application.Abstractions.Handlers;
 
 public interface ICommand;
+
 public interface ICommand<TResult> : ICommand;
 
 public interface ICommandHandler<in TCommand> where TCommand : ICommand

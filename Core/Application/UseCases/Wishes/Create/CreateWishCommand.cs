@@ -1,5 +1,6 @@
-﻿using Application.Abstractions.Handlers;
-using Application.UseCases.Wishes.GetByQuery;
+using Application.Abstractions.Handlers;
+using DataTransfertObjects.Requests;
+using DataTransfertObjects.Responses;
 
 namespace Application.UseCases.Wishes.Create;
 

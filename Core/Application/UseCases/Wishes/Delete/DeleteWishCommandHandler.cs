@@ -1,12 +1,12 @@
-﻿using Application.Abstractions.Handlers;
+using Application.Abstractions.Handlers;
 using Application.Abstractions.Services;
 
 namespace Application.UseCases.Wishes.Delete;
 
 public class DeleteWishCommandHandler(IWishesService wishesService) : ICommandHandler<DeleteWishCommand>
 {
-    public async Task HandleAsync(DeleteWishCommand command, CancellationToken cancellationToken)
+    public Task HandleAsync(DeleteWishCommand command, CancellationToken cancellationToken)
     {
-        await wishesService.DeleteAsync(command.Id, cancellationToken);
+        return wishesService.DeleteAsync(command.Id, cancellationToken);
     }
 }
