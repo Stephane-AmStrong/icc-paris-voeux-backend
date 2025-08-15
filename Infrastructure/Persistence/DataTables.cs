@@ -1,8 +1,8 @@
 namespace Persistence;
 
-public sealed class DataTables
+public static class DataTables
 {
-    public const string Pulses = "WT_Pulses";
-    public const string Users = "WT_Users";
-    public const string Wishes = "WT_Wishes";
+    public const string Pulses = "Pulses";
+    public const string Users = "Users";
+    public const string Wishes = "Wishes";
 }
