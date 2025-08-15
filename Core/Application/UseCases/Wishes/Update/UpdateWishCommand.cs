@@ -1,4 +1,5 @@
-﻿using Application.Abstractions.Handlers;
+using Application.Abstractions.Handlers;
+using DataTransfertObjects.Requests;
 
 namespace Application.UseCases.Wishes.Update;
 

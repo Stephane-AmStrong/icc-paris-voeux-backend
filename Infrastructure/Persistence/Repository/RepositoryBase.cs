@@ -1,22 +1,23 @@
 #nullable enable
 using System.Linq.Expressions;
 using System.Reflection;
+using Domain.Abstractions.Repositories;
 using Domain.Entities;
-using Domain.Repositories.Abstractions;
 using Domain.Shared.Common;
 using MongoDB.Bson;
+using MongoDB.Driver.Linq;
 using MongoDB.Driver;
 
 namespace Persistence.Repository;
 
-public class RepositoryBase<T> : IRepositoryBase<T> where T : BaseEntity
+public class RepositoryBase<T> : IRepositoryBase<T> where T : IBaseEntity
 {
     protected IMongoCollection<T> Collection { get; }
 
     protected RepositoryBase(IMongoDatabase database, string collectionName) => Collection = database.GetCollection<T>(collectionName);
 
 
-    public async Task<PagedList<T>> BaseQueryWithFiltersAsync(BaseQueryParameters<T> queryParameters, CancellationToken cancellationToken)
+    public async Task<PagedList<T>> BaseQueryWithFiltersAsync(BaseQuery<T> queryParameters, CancellationToken cancellationToken)
     {
         List<FilterDefinition<T>> filters = [];
 
@@ -61,6 +62,53 @@ public class RepositoryBase<T> : IRepositoryBase<T> where T : BaseEntity
         return new PagedList<T>(await find.ToListAsync(cancellationToken), totalCount, queryParameters.Page!.Value, queryParameters.PageSize!.Value);
     }
 
+    protected async Task<List<T>> BaseGetLatestByGroupAsync<TKey>(
+        Expression<Func<T, bool>> filterPredicate,
+        Expression<Func<T, TKey>> groupBySelector,
+        Expression<Func<T, DateTime>> orderBySelector,
+        CancellationToken cancellationToken)
+    {
+        var filter = Builders<T>.Filter.Where(filterPredicate);
+
+        var groupByProperty = GetPropertyName(groupBySelector);
+        var orderByProperty = GetPropertyName(orderBySelector);
+
+/*
+public static BsonDocument ToBsonDocument<T>(this FilterDefinition<T> filter)
+{
+    var serializerRegistry = BsonSerializer.SerializerRegistry;
+    var documentSerializer = serializerRegistry.GetSerializer<T>();
+    return filter.Render(new RenderArgs<T>(documentSerializer, serializerRegistry));
+}
+*/
+
+        var pipeline = new BsonDocument[]
+        {
+            // new BsonDocument("$match", filter.Render(new RenderArgs(Collection.DocumentSerializer, Collection.Settings.SerializerRegistry))),
+            new BsonDocument("$match", filter.ToBsonDocument()),
+
+            new BsonDocument("$sort", new BsonDocument
+            {
+                [groupByProperty] = 1,
+                [orderByProperty] = -1
+            }),
+
+            new BsonDocument("$group", new BsonDocument
+            {
+                ["_id"] = $"${groupByProperty}",
+                ["latestDocument"] = new BsonDocument("$first", "$$ROOT")
+            }),
+
+            new BsonDocument("$replaceRoot", new BsonDocument
+            {
+                ["newRoot"] = "$latestDocument"
+            })
+        };
+
+        var cursor = await Collection.AggregateAsync<T>(pipeline, cancellationToken: cancellationToken);
+        return await cursor.ToListAsync(cancellationToken);
+    }
+
     public Task<List<T>> BaseFindByConditionAsync(Expression<Func<T, bool>> expression, CancellationToken cancellationToken)
     {
         return Collection.Find(expression).ToListAsync(cancellationToken);
@@ -77,9 +125,9 @@ public class RepositoryBase<T> : IRepositoryBase<T> where T : BaseEntity
         return Collection.ReplaceOneAsync(filter, entity, cancellationToken: cancellationToken);
     }
 
-    public Task BaseDeleteAsync(T entity, CancellationToken cancellationToken)
+    public Task BaseDeleteAsync(string id, CancellationToken cancellationToken)
     {
-        var filter = Builders<T>.Filter.Eq(e=> e.Id, entity.Id);
+        var filter = Builders<T>.Filter.Eq(e=> e.Id, id);
         return Collection.DeleteOneAsync(filter, cancellationToken);
     }
 
@@ -114,5 +162,15 @@ public class RepositoryBase<T> : IRepositoryBase<T> where T : BaseEntity
         }
 
         return sortDefinitions.Count > 0 ? Builders<T>.Sort.Combine(sortDefinitions) : null;
+    }
+
+    private static string GetPropertyName<TSource, TProperty>(Expression<Func<TSource, TProperty>> propertyExpression)
+    {
+        if (propertyExpression.Body is MemberExpression memberExpression)
+        {
+            return memberExpression.Member.Name;
+        }
+
+        throw new ArgumentException("Expression must be a property access", nameof(propertyExpression));
     }
 }

@@ -1,9 +1,9 @@
-﻿using Application.Abstractions.Handlers;
+using Application.Abstractions.Handlers;
 using Domain.Errors;
 using FluentValidation;
 using FluentValidation.Results;
 
-namespace Application.Abstractions.Behaviors;
+namespace Application.Abstractions.Decorators;
 
 public static class ValidationDecorator
 {

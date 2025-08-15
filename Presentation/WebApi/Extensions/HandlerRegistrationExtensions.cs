@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.Behaviors;
+﻿using Application.Abstractions.Decorators;
 using Application.Abstractions.Handlers;
 using FluentValidation;
 

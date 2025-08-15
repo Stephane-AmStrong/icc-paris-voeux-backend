@@ -1,6 +1,6 @@
 ﻿namespace Domain.Entities;
 
-public abstract class BaseEntity
+public interface IBaseEntity
 {
     public string Id { get; init; }
 }

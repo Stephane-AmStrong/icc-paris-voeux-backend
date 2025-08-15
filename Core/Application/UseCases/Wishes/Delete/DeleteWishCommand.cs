@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.Handlers;
+using Application.Abstractions.Handlers;
 
 namespace Application.UseCases.Wishes.Delete;
 

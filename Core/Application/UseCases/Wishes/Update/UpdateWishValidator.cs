@@ -1,33 +1,43 @@
 using Application.Common;
-using Domain.Repositories.Abstractions;
+using Domain.Abstractions.Repositories;
 using FluentValidation;
 
 namespace Application.UseCases.Wishes.Update;
 
 public class UpdateWishValidator : AbstractValidator<UpdateWishCommand>
 {
-    public UpdateWishValidator(IWishesRepository wishesRepository)
+    public UpdateWishValidator(IWishesRepository wishesRepository, IUsersRepository usersRepository)
     {
+        RuleFor(command => command.Payload.Title)
+            .NotNull()
+            .WithMessage(Validation.Messages.FieldRequired)
+            .OverridePropertyName(nameof(UpdateWishCommand.Payload.Title));
+
+        RuleFor(command => command.Payload.Type)
+            .NotNull()
+            .WithMessage(Validation.Messages.FieldRequired)
+            .OverridePropertyName(nameof(UpdateWishCommand.Payload.Type));
 
         RuleFor(command => command.Id)
+            .Cascade(CascadeMode.Stop)
+            .NotEmpty()
+            .WithMessage(string.Format(Validation.Messages.FieldRequired))
+            .MustAsync(async (wishId, cancellationToken) =>
+            {
+                var wish = await wishesRepository.GetByIdAsync(wishId, cancellationToken);
+                return wish is not null;
+            }).WithMessage(string.Format(Validation.Messages.EntityNotFound, Validation.Entities.Wish));
+
+        RuleFor(command => command.Payload.UserId)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty()
             .WithMessage(Validation.Messages.FieldRequired)
-            .MustAsync(async (id, cancellationToken) =>
+            .OverridePropertyName(nameof(UpdateWishCommand.Payload.UserId))
+            .MustAsync(async (userId, cancellationToken) =>
             {
-                var wish = await wishesRepository.GetByIdAsync(id, cancellationToken);
-                return wish != null;
+                var user = await usersRepository.GetByIdAsync(userId, cancellationToken);
+                return user is not null;
             })
-            .WithMessage(string.Format(Validation.Messages.EntityNotFound, Validation.Entities.Wish));
-
-        RuleFor(command => command.Payload.Email)
-            .NotEmpty()
-            .WithMessage(Validation.Messages.FieldRequired);
-
-        RuleFor(command => command.Payload)
-            .Must(HaveAtLeastOnePropertySet)
-            .WithMessage(string.Format(Validation.Messages.AtLeastOnePropertyRequired, Validation.Entities.Wish, "Spiritually, FamiliallyRelationally, FinanciallyMaterially, ProfessionallyAcademically, Other"));
+            .WithMessage(string.Format(Validation.Messages.EntityNotFound, Validation.Entities.User));
     }
-
-    private static bool HaveAtLeastOnePropertySet(WishUpdateRequest wish) => !string.IsNullOrWhiteSpace(wish.Spiritually) || !string.IsNullOrWhiteSpace(wish.FamiliallyRelationally) || !string.IsNullOrWhiteSpace(wish.FinanciallyMaterially) || !string.IsNullOrWhiteSpace(wish.ProfessionallyAcademically) || !string.IsNullOrWhiteSpace(wish.Other);
-
 }

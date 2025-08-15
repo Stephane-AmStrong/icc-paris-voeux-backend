@@ -1,6 +1,8 @@
 ﻿using System.Text.Json;
-using Application.Common;
 using Domain.Errors;
+using DataTransfertObjects.Enumerations;
+using DataTransfertObjects.QueryParameters;
+using WebApi.Models;
 
 namespace WebApi.Middleware;
 
@@ -18,74 +20,117 @@ internal sealed class ExceptionHandlingMiddleware(ILogger<ExceptionHandlingMiddl
             await HandleExceptionAsync(context, e);
         }
     }
-
     private static async Task HandleExceptionAsync(HttpContext httpContext, Exception exception)
     {
-        // Avoid overwriting an already-started answer
         if (httpContext.Response.HasStarted) return;
 
         httpContext.Response.Clear();
         httpContext.Response.ContentType = "application/json";
 
-        var (statusCode, message) = GetErrorDetails(exception);
+        var (statusCode, errorResponse) = GetErrorResponse(exception, httpContext.TraceIdentifier);
         httpContext.Response.StatusCode = statusCode;
-
-        object response;
-        if (exception is ValidationError validationEx)
-        {
-            response = new
-            {
-                Title = message,
-                Status = statusCode,
-                validationEx.Errors,
-                TraceId = httpContext.TraceIdentifier
-            };
-        }
-        else
-        {
-            response = new
-            {
-                Error = new
-                {
-                    Message = message,
-                    Type = exception.GetType().Name,
-                    TraceId = httpContext.TraceIdentifier
-                }
-            };
-        }
 
         var options = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
 
-        await httpContext.Response.WriteAsync(JsonSerializer.Serialize(response, options));
+        await httpContext.Response.WriteAsync(JsonSerializer.Serialize(errorResponse, options));
     }
 
-    private static (int StatusCode, string Message) GetErrorDetails(Exception exception)
+    private static (int StatusCode, ApiErrorResponse Response) GetErrorResponse(Exception exception, string traceId)
     {
         return exception switch
         {
-            ValidationError => (StatusCodes.Status400BadRequest, exception.Message),
-            BadRequestException => (StatusCodes.Status400BadRequest, exception.Message),
-            BadHttpRequestException => (StatusCodes.Status400BadRequest, exception.Message),
-            NotFoundException => (StatusCodes.Status404NotFound, exception.Message),
-            JsonException => (StatusCodes.Status400BadRequest, "Invalid JSON format"),
-            _ => (StatusCodes.Status500InternalServerError, "An internal server error occurred")
+            BadRequestException validationEx => (
+                StatusCodes.Status400BadRequest,
+                ApiErrorResponse.ValidationError(
+                    validationEx.Errors ?? new Dictionary<string, string[]>(),
+                    traceId)
+            ),
+            BadHttpRequestException httpEx when IsEnumBindingError(httpEx.Message) => (
+                StatusCodes.Status400BadRequest,
+                CreateEnumValidationResponse(httpEx.Message, traceId)
+            ),
+            BadHttpRequestException httpEx => (
+                StatusCodes.Status400BadRequest,
+                ApiErrorResponse.BadRequest(httpEx.Message, traceId)
+            ),
+            NotFoundException notFoundEx => (
+                StatusCodes.Status404NotFound,
+                ApiErrorResponse.NotFound(notFoundEx.Message, traceId)
+            ),
+            JsonException => (
+                StatusCodes.Status400BadRequest,
+                ApiErrorResponse.InvalidJson(traceId)
+            ),
+            _ => (
+                StatusCodes.Status500InternalServerError,
+                ApiErrorResponse.InternalServerError(traceId)
+            )
         };
     }
 
-    private void LogException(Exception e)
+    private static ApiErrorResponse CreateEnumValidationResponse(string errorMessage, string traceId)
     {
-        if (e is ValidationError validationEx)
+        var match = System.Text.RegularExpressions.Regex.Match(
+            errorMessage,
+            @"Failed to bind parameter "".*?(\w+)"" from ""(.*?)""");
+
+        if (!match.Success)
         {
-            logger.LogWarning("Validation error: {Errors}",
-                string.Join(", ", validationEx.Errors.SelectMany(err => err.Value.Select(msg => $"[{err.Key}] {msg}")))
-            );
+            return ApiErrorResponse.ValidationError(
+                new Dictionary<string, string[]>
+                {
+                    ["Parameter"] = ["Invalid enum parameter value"]
+                },
+                traceId);
+        }
+
+        var paramName = match.Groups[1].Value;
+        var invalidValue = match.Groups[2].Value;
+        var errors = new Dictionary<string, string[]>();
+
+        if (EnumParameters.TryGetValue(paramName, out var enumInfo))
+        {
+            var validValues = string.Join(", ", Enum.GetNames(enumInfo.EnumType));
+            errors[paramName] = [$"Invalid {enumInfo.FriendlyName} '{invalidValue}'. Valid values are: {validValues}"];
         }
         else
         {
-            logger.LogError(e, "An unhandled exception occurred: {Message}", e.Message);
+            errors[paramName] = [$"Invalid enum value '{invalidValue}'"];
+        }
+
+        return ApiErrorResponse.ValidationError(errors, traceId);
+    }
+
+    private static bool IsEnumBindingError(string errorMessage)
+    {
+        if (!errorMessage.Contains("Failed to bind parameter")) return false;
+        return EnumParameters.Keys.Any(paramName => errorMessage.Contains(paramName));
+    }
+
+    private static readonly Dictionary<string, (Type EnumType, string FriendlyName)> EnumParameters =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            { nameof(WishQueryParameters.OfType), (typeof(WishType), "wish type") }
+        };
+
+    private void LogException(Exception e)
+    {
+        if (e is BadRequestException validationEx && validationEx.Errors != null)
+        {
+            logger.LogWarning("Validation error: {Errors}",
+                string.Join(", ", validationEx.Errors.SelectMany(err =>
+                    err.Value.Select(msg => $"[{err.Key}] {msg}"))));
+        }
+        else if (e is BadHttpRequestException httpEx && IsEnumBindingError(httpEx.Message))
+        {
+            logger.LogWarning("Enum binding error: {Message}", httpEx.Message);
+        }
+        else
+        {
+            logger.LogError(e, "An unhandled exception Created: {Message}", e.Message);
         }
     }
 }
