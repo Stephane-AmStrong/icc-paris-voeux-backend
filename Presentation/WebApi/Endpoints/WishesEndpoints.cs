@@ -6,6 +6,10 @@ using Application.UseCases.Wishes.GetById;
 using Application.UseCases.Wishes.GetByQuery;
 using Application.UseCases.Wishes.Update;
 using Domain.Shared.Common;
+using DataTransfertObjects.QueryParameters;
+using DataTransfertObjects.Requests;
+using DataTransfertObjects.Responses;
+using WebApi.Models;
 
 namespace WebApi.Endpoints;
 public static class WishesEndpoints
@@ -16,31 +20,33 @@ public static class WishesEndpoints
             .WithTags("Wishes");
 
         group.MapGet("/", GetByQueryParameters)
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
             .Produces<IList<WishResponse>>(StatusCodes.Status200OK);
 
         group.MapGet("/{id}", GetWishById)
-            .Produces<WishResponse>(StatusCodes.Status200OK)
+            .Produces<WishDetailedResponse>(StatusCodes.Status200OK)
             .WithName(nameof(GetWishById));
 
         group.MapPost("/", CreateWish)
-            .Produces<WishResponse>(StatusCodes.Status201Created)
-            .ProducesValidationProblem(StatusCodes.Status400BadRequest);
+            .Produces<WishDetailedResponse>(StatusCodes.Status201Created)
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest);
 
         group.MapDelete("/{id}", DeleteWish)
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapPut("/{id}", UpdateWish)
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
     }
 
     // GET /api/wishes
-    private static  async Task<IResult> GetByQueryParameters(IQueryHandler<GetWishByQuery, PagedList<WishResponse>> handler, [AsParameters] WishQuery queryParameters, HttpResponse response, CancellationToken cancellationToken)
+    private static  async Task<IResult> GetByQueryParameters(IQueryHandler<GetWishQuery, PagedList<WishResponse>> handler, [AsParameters] WishQueryParameters queryParameters, HttpResponse response, CancellationToken cancellationToken)
     {
-        var wishesResponse = await handler.HandleAsync(new GetWishByQuery(queryParameters), cancellationToken);
-        
+        var wishesResponse = await handler.HandleAsync(new GetWishQuery(queryParameters), cancellationToken);
+
         response.Headers.Append("X-Pagination", JsonSerializer.Serialize(wishesResponse.MetaData));
 
         return Results.Ok(wishesResponse);
@@ -70,7 +76,7 @@ public static class WishesEndpoints
     // PUT /api/wishes/{id}
     private static async Task<IResult> UpdateWish(ICommandHandler<UpdateWishCommand> handler, string id, WishUpdateRequest wishRequest, CancellationToken cancellationToken)
     {
-        await handler.HandleAsync(new UpdateWishCommand(id, wishRequest), cancellationToken);;
+        await handler.HandleAsync(new UpdateWishCommand(id, wishRequest), cancellationToken);
         return Results.NoContent();
     }
 }

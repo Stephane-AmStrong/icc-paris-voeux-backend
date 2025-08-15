@@ -7,6 +7,9 @@ using WebApi.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure custom JSON configurations
+builder.AddCustomJsonConfigurations();
+
 // Configures Serilog
 builder.Host.UseSerilog((context, services, configuration) => configuration
     .ReadFrom.Configuration(context.Configuration)
@@ -39,6 +42,7 @@ app.UseCors("CorsPolicy");
 app.UseMiddleware<EndpointLoggingMiddleware>();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
+app.MapUsersEndpoints();
 app.MapWishesEndpoints();
 
 app.UseHttpsRedirection();
