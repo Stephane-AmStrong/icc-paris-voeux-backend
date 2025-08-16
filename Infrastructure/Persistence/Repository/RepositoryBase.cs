@@ -73,29 +73,25 @@ public class RepositoryBase<T> : IRepositoryBase<T> where T : IBaseEntity
         Expression<Func<T, DateTime>> orderBySelector,
         CancellationToken cancellationToken)
     {
-        var filter = Builders<T>.Filter.Where(filterPredicate);
-
         var groupByProperty = GetPropertyName(groupBySelector);
         var orderByProperty = GetPropertyName(orderBySelector);
 
         var pipeline = new BsonDocument[]
         {
-            // new BsonDocument("$match", filter.Render(new RenderArgs(Collection.DocumentSerializer, Collection.Settings.SerializerRegistry))),
-            new BsonDocument("$match", filter.ToBsonDocument()),
-
-            new BsonDocument("$sort", new BsonDocument
+            new("$match", Builders<T>.Filter.Where(filterPredicate).ToBsonDocument()),
+        
+            new("$sort", new BsonDocument
             {
-                [groupByProperty] = 1,
-                [orderByProperty] = -1
+                [orderByProperty] = -1  // -1 pour décroissant (plus récent en premier)
             }),
-
-            new BsonDocument("$group", new BsonDocument
+        
+            new("$group", new BsonDocument
             {
                 ["_id"] = $"${groupByProperty}",
                 ["latestDocument"] = new BsonDocument("$first", "$$ROOT")
             }),
-
-            new BsonDocument("$replaceRoot", new BsonDocument
+        
+            new("$replaceRoot", new BsonDocument
             {
                 ["newRoot"] = "$latestDocument"
             })
