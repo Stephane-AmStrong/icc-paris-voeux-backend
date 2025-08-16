@@ -67,6 +67,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IValidator<UpdateUserCommand>, UpdateUserValidator>();
         services.AddScoped<IValidator<DeleteUserCommand>, DeleteUserValidator>();
 
+        services.AddScoped<IValidator<GetWishQuery>, GetWishQueryValidator>();
         services.AddScoped<IValidator<CreateWishCommand>, CreateWishValidator>();
         services.AddScoped<IValidator<UpdateWishCommand>, UpdateWishValidator>();
         services.AddScoped<IValidator<DeleteWishCommand>, DeleteWishValidator>();
@@ -83,8 +84,9 @@ public static class ServiceCollectionExtensions
         services.AddCommandWithValidation<DeleteUserCommand, DeleteUserCommandHandler, IValidator<DeleteUserCommand>>();
 
         //Wishes
+        services.AddQueryWithValidation<GetWishQuery, GetWishQueryHandler, IValidator<GetWishQuery>, PagedList<WishResponse>>();
         services.AddScoped<IQueryHandler<GetWishByIdQuery, WishDetailedResponse>, GetWishByIdQueryHandler>();
-        services.AddScoped<IQueryHandler<GetWishQuery, PagedList<WishResponse>>, GetWishQueryHandler>();
+        //services.AddScoped<IQueryHandler<GetWishQuery, PagedList<WishResponse>>, GetWishQueryHandler>();
 
         services.AddCommandWithValidation<CreateWishCommand, CreateWishCommandHandler, IValidator<CreateWishCommand>, WishResponse>();
         services.AddCommandWithValidation<UpdateWishCommand, UpdateWishCommandHandler, IValidator<UpdateWishCommand>>();

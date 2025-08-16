@@ -31,6 +31,18 @@ public static class ValidationDecorator
         }
     }
 
+    public sealed class QueryHandler<TQuery, TResult>(IQueryHandler<TQuery, TResult> innerHandler, IValidator<TQuery> validator) : IQueryHandler<TQuery, TResult> where TQuery : IQuery<TResult>
+    {
+        public async Task<TResult> HandleAsync(TQuery query, CancellationToken cancellationToken)
+        {
+            var validationResult = await ValidateAsync(query, validator, cancellationToken);
+
+            if (validationResult.Count > 0) throw new BadRequestException(validationResult);
+
+            return await innerHandler.HandleAsync(query, cancellationToken);
+        }
+    }
+
     private static async Task<Dictionary<string, string[]>> ValidateAsync<TCommand>(TCommand command, IValidator<TCommand> validator, CancellationToken cancellationToken)
     {
         if (validator == null)

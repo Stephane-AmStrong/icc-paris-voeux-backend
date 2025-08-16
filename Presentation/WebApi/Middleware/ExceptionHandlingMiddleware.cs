@@ -48,10 +48,10 @@ internal sealed class ExceptionHandlingMiddleware(ILogger<ExceptionHandlingMiddl
                     validationEx.Errors ?? new Dictionary<string, string[]>(),
                     traceId)
             ),
-            BadHttpRequestException httpEx when IsEnumBindingError(httpEx.Message) => (
+            /*BadHttpRequestException httpEx when IsEnumBindingError(httpEx.Message) => (
                 StatusCodes.Status400BadRequest,
                 CreateEnumValidationResponse(httpEx.Message, traceId)
-            ),
+            ),*/
             BadHttpRequestException httpEx => (
                 StatusCodes.Status400BadRequest,
                 ApiErrorResponse.BadRequest(httpEx.Message, traceId)
