@@ -6,30 +6,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Persistence.Events;
 
-public sealed class EventsDispatcher : IEventsDispatcher
+public sealed class EventsDispatcher(IServiceProvider serviceProvider, ILogger<EventsDispatcher> logger) : IEventsDispatcher
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<EventsDispatcher> _logger;
+    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    private readonly ILogger<EventsDispatcher> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-    // Cache optimisé pour les infos d'événements
+    // Optimized cache for event information
     private static readonly ConcurrentDictionary<Type, EventTypeInfo> EventInfoCache = new();
-    
-    private readonly struct EventTypeInfo
-    {
-        public Type HandlerType { get; init; }
-        public MethodInfo HandleMethod { get; init; }
-        public Func<IServiceProvider, object[]> HandlersFactory { get; init; }
-    }
-
-    public EventsDispatcher(IServiceProvider serviceProvider, ILogger<EventsDispatcher> logger)
-    {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     public async Task DispatchAsync(IEnumerable<IDomainEvent> domainEvents, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(domainEvents);
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         var eventArray = domainEvents switch
         {
@@ -43,32 +32,38 @@ public sealed class EventsDispatcher : IEventsDispatcher
         _logger.LogDebug("Dispatching {EventCount} domain events", eventArray.Length);
 
         using var scope = _serviceProvider.CreateScope();
+        var serviceProvider = scope.ServiceProvider;
+
         var eventGroups = GroupEventsByType(eventArray);
-        
-        // Optimisation : évite l'allocation d'array intermédiaire
-        var tasks = eventGroups.Select(kvp => 
-            DispatchEventGroup(kvp.Key, kvp.Value, scope.ServiceProvider, cancellationToken));
+
+        // Optimization: avoid intermediate array allocation
+        var tasks = eventGroups.Select(kvp =>
+            DispatchEventGroup(kvp.Key, kvp.Value, serviceProvider, cancellationToken));
 
         await Task.WhenAll(tasks);
+
+        stopwatch.Stop();
+
+        _logger.LogDebug("Dispatched {EventCount} events in {ElapsedMs}ms", eventArray.Length, stopwatch.ElapsedMilliseconds);
     }
 
     private static Dictionary<Type, List<IDomainEvent>> GroupEventsByType(ReadOnlySpan<IDomainEvent> events)
     {
         var groups = new Dictionary<Type, List<IDomainEvent>>();
-        
+
         foreach (var evt in events)
         {
             var eventType = evt.GetType();
-            
+
             if (!groups.TryGetValue(eventType, out var eventList))
             {
                 eventList = new List<IDomainEvent>();
                 groups[eventType] = eventList;
             }
-            
+
             eventList.Add(evt);
         }
-        
+
         return groups;
     }
 
@@ -83,7 +78,7 @@ public sealed class EventsDispatcher : IEventsDispatcher
             return;
         }
 
-        _logger.LogDebug("Processing {EventCount} events of type {EventType} with {HandlerCount} handlers", 
+        _logger.LogDebug("Processing {EventCount} events of type {EventType} with {HandlerCount} handlers",
             events.Count, eventType.Name, handlers.Length);
 
         var totalTasks = events.Count * handlers.Length;
@@ -108,7 +103,7 @@ public sealed class EventsDispatcher : IEventsDispatcher
         return EventInfoCache.GetOrAdd(eventType, static et =>
         {
             var handlerType = typeof(IEventHandler<>).MakeGenericType(et);
-            
+
             var handleMethod = handlerType.GetMethod("Handle", [et, typeof(CancellationToken)])
                 ?? throw new InvalidOperationException($"Handle method not found on {handlerType.Name}");
 
@@ -123,16 +118,15 @@ public sealed class EventsDispatcher : IEventsDispatcher
         });
     }
 
-    // ✅ VERSION CORRIGÉE
     private static Func<IServiceProvider, object[]> CreateHandlersFactory(Type handlerType)
     {
         return serviceProvider =>
         {
             var handlers = serviceProvider.GetServices(handlerType);
-            
+
             // Filtrage cohérent dans tous les cas
             var filteredHandlers = new List<object>();
-            
+
             foreach (var handler in handlers)
             {
                 if (handler is not null)
@@ -140,7 +134,7 @@ public sealed class EventsDispatcher : IEventsDispatcher
                     filteredHandlers.Add(handler);
                 }
             }
-            
+
             return filteredHandlers.ToArray();
         };
     }
@@ -150,7 +144,7 @@ public sealed class EventsDispatcher : IEventsDispatcher
         try
         {
             var result = handleMethod.Invoke(handler, [domainEvent, cancellationToken]);
-            
+
             switch (result)
             {
                 case Task task:
@@ -165,11 +159,14 @@ public sealed class EventsDispatcher : IEventsDispatcher
                     throw new InvalidOperationException($"Handler method must return Task or ValueTask, got {result.GetType().Name}");
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ShouldContinueAfterException(ex))
         {
-            _logger.LogError(ex, "Handler {HandlerType} failed for event {EventType}", 
-                handler.GetType().Name, domainEvent.GetType().Name);
-            // Continue avec les autres handlers
+            _logger.LogError(ex, "Handler {HandlerType} failed for event {EventType}", handler.GetType().Name, domainEvent.GetType().Name);
         }
+    }
+
+    private static bool ShouldContinueAfterException(Exception ex)
+    {
+        return ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException);
     }
 }
