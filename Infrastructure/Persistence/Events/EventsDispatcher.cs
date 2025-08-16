@@ -1,64 +1,75 @@
 using System.Collections.Concurrent;
 using Domain.Abstractions.Events;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Persistence.Events;
 
-public class EventsDispatcher(IServiceProvider serviceProvider) : IEventsDispatcher
+public sealed class EventsDispatcher(IServiceProvider serviceProvider, ILogger<EventsDispatcher> logger)
+    : IEventsDispatcher
 {
-    private static readonly ConcurrentDictionary<Type, Type> HandlerTypeDictionary = new();
-    private static readonly ConcurrentDictionary<Type, Type> WrapperTypeDictionary = new();
+    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    private readonly ILogger<EventsDispatcher> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-    public async Task DispatchAsync(
-        IEnumerable<IDomainEvent> domainEvents,
-        CancellationToken cancellationToken = default)
+    public async Task DispatchAsync(IEnumerable<IDomainEvent> domainEvents, CancellationToken cancellationToken)
     {
-        foreach (IDomainEvent domainEvent in domainEvents)
+        ArgumentNullException.ThrowIfNull(domainEvents);
+
+        var events = domainEvents.ToList();
+        if (events.Count == 0) return;
+
+        _logger.LogDebug("Dispatching {EventCount} domain events", events.Count);
+
+        // Group events by type and process them in parallel
+        var tasks = events
+            .GroupBy(e => e.GetType())
+            .Select(group => DispatchEventGroup(group.Key, group.ToList(), cancellationToken));
+
+        await Task.WhenAll(tasks);
+    }
+
+    private async Task DispatchEventGroup(Type eventType, List<IDomainEvent> events, CancellationToken cancellationToken)
+    {
+        var handlerType = typeof(IEventHandler<>).MakeGenericType(eventType);
+
+        using var scope = _serviceProvider.CreateScope();
+        var handlers = scope.ServiceProvider.GetServices(handlerType).Where(h => h is not null).ToList();
+
+        if (handlers.Count == 0)
         {
-            using IServiceScope scope = serviceProvider.CreateScope();
+            _logger.LogWarning("No handlers found for event type {EventType}", eventType.Name);
+            return;
+        }
 
-            Type domainEventType = domainEvent.GetType();
-            Type handlerType = HandlerTypeDictionary.GetOrAdd(
-                domainEventType,
-                et => typeof(IEventHandler<>).MakeGenericType(et));
+        _logger.LogDebug("Processing {EventCount} events of type {EventType} with {HandlerCount} handlers", events.Count, eventType.Name, handlers.Count);
 
-            IEnumerable<object?> handlers = scope.ServiceProvider.GetServices(handlerType);
+        // Exécute tous les handlers pour tous les événements de ce type
+        var tasks = from eventItem in events
+                   from handler in handlers
+                   select ExecuteHandlerSafely(handler!, eventItem, cancellationToken);
 
-            foreach (object? handler in handlers)
+        await Task.WhenAll(tasks);
+    }
+
+    private async Task ExecuteHandlerSafely(object handler, IDomainEvent domainEvent, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var handleMethod = handler.GetType().GetMethod("Handle") 
+                ?? throw new InvalidOperationException($"Handle method not found on {handler.GetType().Name}");
+
+            if (handleMethod.Invoke(handler, [domainEvent, cancellationToken]) is Task task)
             {
-                if (handler is null)
-                {
-                    continue;
-                }
-
-                var handlerWrapper = HandlerWrapper.Create(handler, domainEventType);
-
-                await handlerWrapper.Handle(domainEvent, cancellationToken);
+                await task;
             }
         }
-    }
-
-    private abstract class HandlerWrapper
-    {
-        public abstract Task Handle(IDomainEvent domainEvent, CancellationToken cancellationToken);
-
-        public static HandlerWrapper Create(object handler, Type domainEventType)
+        catch (Exception ex)
         {
-            Type wrapperType = WrapperTypeDictionary.GetOrAdd(
-                domainEventType,
-                et => typeof(HandlerWrapper<>).MakeGenericType(et));
-
-            return (HandlerWrapper)Activator.CreateInstance(wrapperType, handler);
-        }
-    }
-
-    private sealed class HandlerWrapper<T>(object handler) : HandlerWrapper where T : IDomainEvent
-    {
-        private readonly IEventHandler<T> _handler = (IEventHandler<T>)handler;
-
-        public override async Task Handle(IDomainEvent domainEvent, CancellationToken cancellationToken)
-        {
-            await _handler.Handle((T)domainEvent, cancellationToken);
+            _logger.LogError(ex, 
+                "Handler {HandlerType} failed to process event {EventType}", 
+                handler.GetType().Name, 
+                domainEvent.GetType().Name);
+            throw;
         }
     }
 }
