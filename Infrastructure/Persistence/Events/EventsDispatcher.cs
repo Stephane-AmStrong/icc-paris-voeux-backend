@@ -6,86 +6,170 @@ using Microsoft.Extensions.Logging;
 
 namespace Persistence.Events;
 
-public sealed class EventsDispatcher(IServiceProvider serviceProvider, ILogger<EventsDispatcher> logger)
-    : IEventsDispatcher
+public sealed class EventsDispatcher : IEventsDispatcher
 {
-    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-    private readonly ILogger<EventsDispatcher> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<EventsDispatcher> _logger;
 
-    // Cache of types AND methods
-    private static readonly ConcurrentDictionary<Type, Type> HandlerTypeCache = new();
-    private static readonly ConcurrentDictionary<Type, MethodInfo> HandleMethodCache = new();
+    // Cache optimisé pour les infos d'événements
+    private static readonly ConcurrentDictionary<Type, EventTypeInfo> EventInfoCache = new();
+    
+    private readonly struct EventTypeInfo
+    {
+        public Type HandlerType { get; init; }
+        public MethodInfo HandleMethod { get; init; }
+        public Func<IServiceProvider, object[]> HandlersFactory { get; init; }
+    }
+
+    public EventsDispatcher(IServiceProvider serviceProvider, ILogger<EventsDispatcher> logger)
+    {
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
 
     public async Task DispatchAsync(IEnumerable<IDomainEvent> domainEvents, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(domainEvents);
 
-        var events = domainEvents.ToList();
-        if (events.Count == 0) return;
+        var eventArray = domainEvents switch
+        {
+            IDomainEvent[] array => array,
+            ICollection<IDomainEvent> collection => collection.ToArray(),
+            _ => domainEvents.ToArray()
+        };
 
-        _logger.LogDebug("Dispatching {EventCount} domain events", events.Count);
+        if (eventArray.Length == 0) return;
+
+        _logger.LogDebug("Dispatching {EventCount} domain events", eventArray.Length);
 
         using var scope = _serviceProvider.CreateScope();
+        var eventGroups = GroupEventsByType(eventArray);
         
-        var tasks = events
-            .GroupBy(e => e.GetType())
-            .Select(group => DispatchEventGroup(group.Key, group.ToList(), scope.ServiceProvider, cancellationToken))
-            .ToList();
+        // Optimisation : évite l'allocation d'array intermédiaire
+        var tasks = eventGroups.Select(kvp => 
+            DispatchEventGroup(kvp.Key, kvp.Value, scope.ServiceProvider, cancellationToken));
 
         await Task.WhenAll(tasks);
     }
 
+    private static Dictionary<Type, List<IDomainEvent>> GroupEventsByType(ReadOnlySpan<IDomainEvent> events)
+    {
+        var groups = new Dictionary<Type, List<IDomainEvent>>();
+        
+        foreach (var evt in events)
+        {
+            var eventType = evt.GetType();
+            
+            if (!groups.TryGetValue(eventType, out var eventList))
+            {
+                eventList = new List<IDomainEvent>();
+                groups[eventType] = eventList;
+            }
+            
+            eventList.Add(evt);
+        }
+        
+        return groups;
+    }
+
     private async Task DispatchEventGroup(Type eventType, List<IDomainEvent> events, IServiceProvider serviceProvider, CancellationToken cancellationToken)
     {
-        var handlerType = GetHandlerType(eventType);
-        var handlers = serviceProvider.GetServices(handlerType).Where(h => h is not null).ToList();
+        var eventInfo = GetOrCreateEventInfo(eventType);
+        var handlers = eventInfo.HandlersFactory(serviceProvider);
 
-        if (handlers.Count == 0)
+        if (handlers.Length == 0)
         {
             _logger.LogWarning("No handlers found for event type {EventType}", eventType.Name);
             return;
         }
 
         _logger.LogDebug("Processing {EventCount} events of type {EventType} with {HandlerCount} handlers", 
-            events.Count, eventType.Name, handlers.Count);
+            events.Count, eventType.Name, handlers.Length);
 
-        // Optimization: retrieves the Handle method only once
-        var handleMethod = GetHandleMethod(handlerType);
+        var totalTasks = events.Count * handlers.Length;
+        var tasks = new Task[totalTasks];
+        var taskIndex = 0;
 
-        var tasks = from eventItem in events
-                   from handler in handlers
-                   select ExecuteHandlerSafely(handler, eventItem, handleMethod, cancellationToken);
+        for (var eventIndex = 0; eventIndex < events.Count; eventIndex++)
+        {
+            var eventItem = events[eventIndex];
+            for (var handlerIndex = 0; handlerIndex < handlers.Length; handlerIndex++)
+            {
+                var handler = handlers[handlerIndex];
+                tasks[taskIndex++] = ExecuteHandlerSafely(handler, eventItem, eventInfo.HandleMethod, cancellationToken);
+            }
+        }
 
         await Task.WhenAll(tasks);
     }
 
-    private static Type GetHandlerType(Type eventType)
+    private static EventTypeInfo GetOrCreateEventInfo(Type eventType)
     {
-        return HandlerTypeCache.GetOrAdd(eventType, 
-            static et => typeof(IEventHandler<>).MakeGenericType(et));
+        return EventInfoCache.GetOrAdd(eventType, static et =>
+        {
+            var handlerType = typeof(IEventHandler<>).MakeGenericType(et);
+            
+            var handleMethod = handlerType.GetMethod("Handle", [et, typeof(CancellationToken)])
+                ?? throw new InvalidOperationException($"Handle method not found on {handlerType.Name}");
+
+            var handlersFactory = CreateHandlersFactory(handlerType);
+
+            return new EventTypeInfo
+            {
+                HandlerType = handlerType,
+                HandleMethod = handleMethod,
+                HandlersFactory = handlersFactory
+            };
+        });
     }
 
-    private static MethodInfo GetHandleMethod(Type handlerType)
+    // ✅ VERSION CORRIGÉE
+    private static Func<IServiceProvider, object[]> CreateHandlersFactory(Type handlerType)
     {
-        return HandleMethodCache.GetOrAdd(handlerType, static ht =>
+        return serviceProvider =>
         {
-            var method = ht.GetMethod("Handle", [typeof(IDomainEvent).IsAssignableFrom(ht.GenericTypeArguments[0]) ? ht.GenericTypeArguments[0] : typeof(IDomainEvent), typeof(CancellationToken)]);
-            return method ?? throw new InvalidOperationException($"Handle method not found on {ht.Name}");
-        });
+            var handlers = serviceProvider.GetServices(handlerType);
+            
+            // Filtrage cohérent dans tous les cas
+            var filteredHandlers = new List<object>();
+            
+            foreach (var handler in handlers)
+            {
+                if (handler is not null)
+                {
+                    filteredHandlers.Add(handler);
+                }
+            }
+            
+            return filteredHandlers.ToArray();
+        };
     }
 
     private async Task ExecuteHandlerSafely(object handler, IDomainEvent domainEvent, MethodInfo handleMethod, CancellationToken cancellationToken)
     {
         try
         {
-            if (handleMethod.Invoke(handler, [domainEvent, cancellationToken]) is Task task)
+            var result = handleMethod.Invoke(handler, [domainEvent, cancellationToken]);
+            
+            switch (result)
             {
-                await task;
+                case Task task:
+                    await task;
+                    break;
+                case ValueTask valueTask:
+                    await valueTask;
+                    break;
+                case null:
+                    throw new InvalidOperationException("Handler method returned null");
+                default:
+                    throw new InvalidOperationException($"Handler method must return Task or ValueTask, got {result.GetType().Name}");
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Handler {HandlerType} failed for event {EventType} - continuing with other handlers", handler.GetType().Name, domainEvent.GetType().Name);
+            _logger.LogError(ex, "Handler {HandlerType} failed for event {EventType}", 
+                handler.GetType().Name, domainEvent.GetType().Name);
+            // Continue avec les autres handlers
         }
     }
 }
