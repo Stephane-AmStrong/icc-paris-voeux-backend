@@ -1,64 +1,172 @@
 using System.Collections.Concurrent;
+using System.Reflection;
 using Domain.Abstractions.Events;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Persistence.Events;
 
-public class EventsDispatcher(IServiceProvider serviceProvider) : IEventsDispatcher
+public sealed class EventsDispatcher(IServiceProvider serviceProvider, ILogger<EventsDispatcher> logger) : IEventsDispatcher
 {
-    private static readonly ConcurrentDictionary<Type, Type> HandlerTypeDictionary = new();
-    private static readonly ConcurrentDictionary<Type, Type> WrapperTypeDictionary = new();
+    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    private readonly ILogger<EventsDispatcher> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-    public async Task DispatchAsync(
-        IEnumerable<IDomainEvent> domainEvents,
-        CancellationToken cancellationToken = default)
+    // Optimized cache for event information
+    private static readonly ConcurrentDictionary<Type, EventTypeInfo> EventInfoCache = new();
+
+    public async Task DispatchAsync(IEnumerable<IDomainEvent> domainEvents, CancellationToken cancellationToken)
     {
-        foreach (IDomainEvent domainEvent in domainEvents)
+        ArgumentNullException.ThrowIfNull(domainEvents);
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        var eventArray = domainEvents switch
         {
-            using IServiceScope scope = serviceProvider.CreateScope();
+            IDomainEvent[] array => array,
+            ICollection<IDomainEvent> collection => collection.ToArray(),
+            _ => domainEvents.ToArray()
+        };
 
-            Type domainEventType = domainEvent.GetType();
-            Type handlerType = HandlerTypeDictionary.GetOrAdd(
-                domainEventType,
-                et => typeof(IEventHandler<>).MakeGenericType(et));
+        if (eventArray.Length == 0) return;
 
-            IEnumerable<object?> handlers = scope.ServiceProvider.GetServices(handlerType);
+        _logger.LogDebug("Dispatching {EventCount} domain events", eventArray.Length);
 
-            foreach (object? handler in handlers)
+        using var scope = _serviceProvider.CreateScope();
+        var serviceProvider = scope.ServiceProvider;
+
+        var eventGroups = GroupEventsByType(eventArray);
+
+        // Optimization: avoid intermediate array allocation
+        var tasks = eventGroups.Select(kvp =>
+            DispatchEventGroup(kvp.Key, kvp.Value, serviceProvider, cancellationToken));
+
+        await Task.WhenAll(tasks);
+
+        stopwatch.Stop();
+
+        _logger.LogDebug("Dispatched {EventCount} events in {ElapsedMs}ms", eventArray.Length, stopwatch.ElapsedMilliseconds);
+    }
+
+    private static Dictionary<Type, List<IDomainEvent>> GroupEventsByType(ReadOnlySpan<IDomainEvent> events)
+    {
+        var groups = new Dictionary<Type, List<IDomainEvent>>();
+
+        foreach (var evt in events)
+        {
+            var eventType = evt.GetType();
+
+            if (!groups.TryGetValue(eventType, out var eventList))
             {
-                if (handler is null)
-                {
-                    continue;
-                }
+                eventList = new List<IDomainEvent>();
+                groups[eventType] = eventList;
+            }
 
-                var handlerWrapper = HandlerWrapper.Create(handler, domainEventType);
+            eventList.Add(evt);
+        }
 
-                await handlerWrapper.Handle(domainEvent, cancellationToken);
+        return groups;
+    }
+
+    private async Task DispatchEventGroup(Type eventType, List<IDomainEvent> events, IServiceProvider serviceProvider, CancellationToken cancellationToken)
+    {
+        var eventInfo = GetOrCreateEventInfo(eventType);
+        var handlers = eventInfo.HandlersFactory(serviceProvider);
+
+        if (handlers.Length == 0)
+        {
+            _logger.LogWarning("No handlers found for event type {EventType}", eventType.Name);
+            return;
+        }
+
+        _logger.LogDebug("Processing {EventCount} events of type {EventType} with {HandlerCount} handlers",
+            events.Count, eventType.Name, handlers.Length);
+
+        var totalTasks = events.Count * handlers.Length;
+        var tasks = new Task[totalTasks];
+        var taskIndex = 0;
+
+        for (var eventIndex = 0; eventIndex < events.Count; eventIndex++)
+        {
+            var eventItem = events[eventIndex];
+            for (var handlerIndex = 0; handlerIndex < handlers.Length; handlerIndex++)
+            {
+                var handler = handlers[handlerIndex];
+                tasks[taskIndex++] = ExecuteHandlerSafely(handler, eventItem, eventInfo.HandleMethod, cancellationToken);
             }
         }
+
+        await Task.WhenAll(tasks);
     }
 
-    private abstract class HandlerWrapper
+    private static EventTypeInfo GetOrCreateEventInfo(Type eventType)
     {
-        public abstract Task Handle(IDomainEvent domainEvent, CancellationToken cancellationToken);
-
-        public static HandlerWrapper Create(object handler, Type domainEventType)
+        return EventInfoCache.GetOrAdd(eventType, static et =>
         {
-            Type wrapperType = WrapperTypeDictionary.GetOrAdd(
-                domainEventType,
-                et => typeof(HandlerWrapper<>).MakeGenericType(et));
+            var handlerType = typeof(IEventHandler<>).MakeGenericType(et);
 
-            return (HandlerWrapper)Activator.CreateInstance(wrapperType, handler);
+            var handleMethod = handlerType.GetMethod("Handle", [et, typeof(CancellationToken)])
+                ?? throw new InvalidOperationException($"Handle method not found on {handlerType.Name}");
+
+            var handlersFactory = CreateHandlersFactory(handlerType);
+
+            return new EventTypeInfo
+            {
+                HandlerType = handlerType,
+                HandleMethod = handleMethod,
+                HandlersFactory = handlersFactory
+            };
+        });
+    }
+
+    private static Func<IServiceProvider, object[]> CreateHandlersFactory(Type handlerType)
+    {
+        return serviceProvider =>
+        {
+            var handlers = serviceProvider.GetServices(handlerType);
+
+            // Filtrage cohérent dans tous les cas
+            var filteredHandlers = new List<object>();
+
+            foreach (var handler in handlers)
+            {
+                if (handler is not null)
+                {
+                    filteredHandlers.Add(handler);
+                }
+            }
+
+            return filteredHandlers.ToArray();
+        };
+    }
+
+    private async Task ExecuteHandlerSafely(object handler, IDomainEvent domainEvent, MethodInfo handleMethod, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = handleMethod.Invoke(handler, [domainEvent, cancellationToken]);
+
+            switch (result)
+            {
+                case Task task:
+                    await task;
+                    break;
+                case ValueTask valueTask:
+                    await valueTask;
+                    break;
+                case null:
+                    throw new InvalidOperationException("Handler method returned null");
+                default:
+                    throw new InvalidOperationException($"Handler method must return Task or ValueTask, got {result.GetType().Name}");
+            }
+        }
+        catch (Exception ex) when (ShouldContinueAfterException(ex))
+        {
+            _logger.LogError(ex, "Handler {HandlerType} failed for event {EventType}", handler.GetType().Name, domainEvent.GetType().Name);
         }
     }
 
-    private sealed class HandlerWrapper<T>(object handler) : HandlerWrapper where T : IDomainEvent
+    private static bool ShouldContinueAfterException(Exception ex)
     {
-        private readonly IEventHandler<T> _handler = (IEventHandler<T>)handler;
-
-        public override async Task Handle(IDomainEvent domainEvent, CancellationToken cancellationToken)
-        {
-            await _handler.Handle((T)domainEvent, cancellationToken);
-        }
+        return ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException);
     }
 }
