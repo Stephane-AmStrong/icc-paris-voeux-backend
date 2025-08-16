@@ -2,9 +2,9 @@
 
 namespace Domain.Entities;
 
-public record Wish : IBaseEntity
+public record Wish : BaseEntity, IBaseEntity
 {
-    public required string Id { get; init; }
+    public override required string Id { get; set; }
     public required string Title { get; set; }
     public required string Description { get; set; }
     public required string Type { get; set; }

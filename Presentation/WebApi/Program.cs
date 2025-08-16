@@ -21,10 +21,11 @@ builder.Services.ConfigureCors(builder.Configuration);
 builder.Services.ConfigureJsonOptions();
 builder.Services.ConfigureValidation();
 builder.Services.ConfigureSwagger();
-builder.Services.ConfigureMongoDB(builder.Configuration);
+builder.Services.ConfigureMongoDb(builder.Configuration);
 builder.Services.ConfigureRepositories();
 builder.Services.ConfigureServices();
 builder.Services.ConfigureHandlers();
+builder.Services.ConfigureDomainEventHandlers();
 builder.Services.ConfigureGlobalExceptionHandling();
 
 builder.Services.AddHealthChecks();

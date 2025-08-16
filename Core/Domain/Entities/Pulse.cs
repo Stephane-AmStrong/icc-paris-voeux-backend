@@ -1,8 +1,8 @@
 namespace Domain.Entities;
 
-public record Pulse : IBaseEntity
+public record Pulse : BaseEntity, IBaseEntity
 {
-    public required string Id { get; init; }
+    public override required string Id { get; set; }
     public required string UserId { get; init; }
     public required string Status { get; init; }
     public DateTime RecordedAt { get; init; }

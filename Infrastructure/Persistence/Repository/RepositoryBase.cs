@@ -1,20 +1,25 @@
 #nullable enable
 using System.Linq.Expressions;
 using System.Reflection;
+using Domain.Abstractions.Events;
 using Domain.Abstractions.Repositories;
 using Domain.Entities;
 using Domain.Shared.Common;
 using MongoDB.Bson;
-using MongoDB.Driver.Linq;
 using MongoDB.Driver;
 
 namespace Persistence.Repository;
 
 public class RepositoryBase<T> : IRepositoryBase<T> where T : IBaseEntity
 {
+    private readonly IEventsDispatcher _eventsDispatcher;
     protected IMongoCollection<T> Collection { get; }
 
-    protected RepositoryBase(IMongoDatabase database, string collectionName) => Collection = database.GetCollection<T>(collectionName);
+    protected RepositoryBase(IMongoDatabase database, IEventsDispatcher eventsDispatcher, string collectionName)
+    {
+        _eventsDispatcher = eventsDispatcher;
+        Collection = database.GetCollection<T>(collectionName);
+    }
 
 
     public async Task<PagedList<T>> BaseQueryWithFiltersAsync(BaseQuery<T> queryParameters, CancellationToken cancellationToken)
@@ -73,15 +78,6 @@ public class RepositoryBase<T> : IRepositoryBase<T> where T : IBaseEntity
         var groupByProperty = GetPropertyName(groupBySelector);
         var orderByProperty = GetPropertyName(orderBySelector);
 
-/*
-public static BsonDocument ToBsonDocument<T>(this FilterDefinition<T> filter)
-{
-    var serializerRegistry = BsonSerializer.SerializerRegistry;
-    var documentSerializer = serializerRegistry.GetSerializer<T>();
-    return filter.Render(new RenderArgs<T>(documentSerializer, serializerRegistry));
-}
-*/
-
         var pipeline = new BsonDocument[]
         {
             // new BsonDocument("$match", filter.Render(new RenderArgs(Collection.DocumentSerializer, Collection.Settings.SerializerRegistry))),
@@ -116,20 +112,64 @@ public static BsonDocument ToBsonDocument<T>(this FilterDefinition<T> filter)
 
     public Task BaseCreateAsync(T entity, CancellationToken cancellationToken)
     {
-        return Collection.InsertOneAsync(entity, cancellationToken: cancellationToken);
+        if (string.IsNullOrWhiteSpace(entity.Id))
+        {
+            var newId = ObjectId.GenerateNewId().ToString();
+            entity.Id = newId;
+        }
+
+        var insertTask = Collection.InsertOneAsync(entity, cancellationToken: cancellationToken);
+        _ = DispatchDomainEventsAsync(entity, cancellationToken);
+        return insertTask;
     }
 
     public Task BaseUpdateAsync(T entity, CancellationToken cancellationToken)
     {
-        var filter = Builders<T>.Filter.Eq(e=> e.Id, entity.Id);
-        return Collection.ReplaceOneAsync(filter, entity, cancellationToken: cancellationToken);
+        var filter = Builders<T>.Filter.Eq(e => e.Id, entity.Id);
+        var updateTask = Collection.ReplaceOneAsync(filter, entity, cancellationToken: cancellationToken);
+        _ = DispatchDomainEventsAsync(entity, cancellationToken);
+        return updateTask;
     }
 
+    public async Task BaseDeleteAsync(string id, CancellationToken cancellationToken)
+    {
+        var filter = Builders<T>.Filter.Eq(e => e.Id, id);
+
+        var entity = await Collection.Find(filter).FirstOrDefaultAsync(cancellationToken);
+
+        await Collection.DeleteOneAsync(filter, cancellationToken);
+
+        if (entity is not null) _ = DispatchDomainEventsAsync(entity, cancellationToken);
+    }
+
+    /*
     public Task BaseDeleteAsync(string id, CancellationToken cancellationToken)
     {
-        var filter = Builders<T>.Filter.Eq(e=> e.Id, id);
-        return Collection.DeleteOneAsync(filter, cancellationToken);
+        var filter = Builders<T>.Filter.Eq(e => e.Id, id);
+
+        var entityTask = Collection.Find(filter).FirstOrDefaultAsync(cancellationToken);
+        var deleteTask = entityTask.ContinueWith(t =>
+        {
+            var entity = t.Result;
+            if (entity is null) return Task.CompletedTask;
+
+            // Fire-and-forget pour la suppression et le dispatch
+            _ = Collection.DeleteOneAsync(filter, cancellationToken)
+                .ContinueWith(dt =>
+                {
+                    if (dt.IsCompletedSuccessfully)
+                    {
+                        _ = DispatchDomainEventsAsync(entity, cancellationToken);
+                    }
+                    // Optionnel : gestion d'erreur ici si dt.IsFaulted
+                }, cancellationToken);
+
+            return Task.CompletedTask;
+        }, cancellationToken);
+
+        return deleteTask;
     }
+     */
 
     private SortDefinition<T>? BuildSortDefinition(string? orderByQueryString)
     {
@@ -172,5 +212,14 @@ public static BsonDocument ToBsonDocument<T>(this FilterDefinition<T> filter)
         }
 
         throw new ArgumentException("Expression must be a property access", nameof(propertyExpression));
+    }
+
+    private async Task DispatchDomainEventsAsync(T entity, CancellationToken cancellationToken)
+    {
+        if (entity.DomainEvents.Count != 0)
+        {
+            await _eventsDispatcher.DispatchAsync(entity.DomainEvents, cancellationToken);
+            entity.DomainEvents.Clear();
+        }
     }
 }
