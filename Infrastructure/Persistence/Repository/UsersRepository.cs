@@ -1,13 +1,15 @@
 ﻿#nullable enable
 using System.Linq.Expressions;
+using Domain.Abstractions.Events;
 using Domain.Abstractions.Repositories;
 using Domain.Entities;
+using Domain.Events;
 using Domain.Shared.Common;
 using MongoDB.Driver;
 
 namespace Persistence.Repository;
 
-public sealed class UsersRepository(IMongoDatabase database) : RepositoryBase<User>(database, DataTables.Users), IUsersRepository
+public sealed class UsersRepository(IMongoDatabase database, IEventsDispatcher eventsDispatcher) : RepositoryBase<User>(database, eventsDispatcher, DataTables.Users), IUsersRepository
 {
     public Task<PagedList<User>> GetPagedListByQueryAsync(BaseQuery<User> queryParameters, CancellationToken cancellationToken)
     {
@@ -27,6 +29,7 @@ public sealed class UsersRepository(IMongoDatabase database) : RepositoryBase<Us
 
     public async Task CreateAsync(User user, CancellationToken cancellationToken)
     {
+        user.Raise(new UserCreatedEvent(user));
         await BaseCreateAsync(user, cancellationToken);
     }
 

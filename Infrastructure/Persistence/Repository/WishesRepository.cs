@@ -1,5 +1,6 @@
 ﻿#nullable enable
 using System.Linq.Expressions;
+using Domain.Abstractions.Events;
 using Domain.Abstractions.Repositories;
 using Domain.Entities;
 using Domain.Shared.Common;
@@ -7,7 +8,7 @@ using MongoDB.Driver;
 
 namespace Persistence.Repository;
 
-public sealed class WishesRepository(IMongoDatabase database) : RepositoryBase<Wish>(database, DataTables.Wishes), IWishesRepository
+public sealed class WishesRepository(IMongoDatabase database, IEventsDispatcher eventsDispatcher) : RepositoryBase<Wish>(database, eventsDispatcher, DataTables.Wishes), IWishesRepository
 {
     public Task<PagedList<Wish>> GetPagedListByQueryAsync(BaseQuery<Wish> queryParameters, CancellationToken cancellationToken)
     {
