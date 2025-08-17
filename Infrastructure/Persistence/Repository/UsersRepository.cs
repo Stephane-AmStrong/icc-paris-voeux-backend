@@ -41,6 +41,8 @@ public sealed class UsersRepository(IMongoDatabase database, IEventsDispatcher e
 
     public Task DeleteAsync(string id, CancellationToken cancellationToken)
     {
-        return BaseDeleteAsync(id, cancellationToken);
+        var user = new User { Id = id, Email= string.Empty, FirstName= string.Empty, LastName=string.Empty};
+        user.Raise(new UserDeletedEvent(id));
+        return BaseDeleteAsync(user, cancellationToken);
     }
 }

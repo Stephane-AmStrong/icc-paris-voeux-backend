@@ -94,6 +94,7 @@ public static class ServiceCollectionExtensions
     public static void ConfigureDomainEventHandlers(this IServiceCollection services)
     {
         services.AddScoped<IEventHandler<UserCreatedEvent>, UserCreatedEventHandler>();
+        services.AddScoped<IEventHandler<UserDeletedEvent>, UserDeletedEventHandler>();
         services.AddScoped<IEventHandler<UserUpdatedEvent>, UserUpdatedEventHandler>();
     }
 
