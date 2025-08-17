@@ -94,6 +94,7 @@ public static class ServiceCollectionExtensions
     public static void ConfigureDomainEventHandlers(this IServiceCollection services)
     {
         services.AddScoped<IEventHandler<UserCreatedEvent>, UserCreatedEventHandler>();
+        services.AddScoped<IEventHandler<UserUpdatedEvent>, UserUpdatedEventHandler>();
     }
 
     public static void ConfigureRepositories(this IServiceCollection services)
@@ -116,8 +117,7 @@ public static class ServiceCollectionExtensions
         // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
         services.AddEndpointsApiExplorer();
 
-        services.AddSwaggerGen(c =>
-                        c.SwaggerDoc("v1", new OpenApiInfo { Title = "ICCParis Web API", Version = "v1" }));
+        services.AddSwaggerGen(c => c.SwaggerDoc("v1", new OpenApiInfo { Title = "ICCParis Web API", Version = "v1" }));
     }
 
     public static void ConfigureJsonOptions(this IServiceCollection services)

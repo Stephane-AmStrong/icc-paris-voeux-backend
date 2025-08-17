@@ -35,6 +35,7 @@ public sealed class UsersRepository(IMongoDatabase database, IEventsDispatcher e
 
     public Task UpdateAsync(User user, CancellationToken cancellationToken)
     {
+        user.Raise(new UserUpdatedEvent(user));
         return BaseUpdateAsync(user, cancellationToken);
     }
 
