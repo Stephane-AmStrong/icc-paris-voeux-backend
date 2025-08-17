@@ -38,6 +38,7 @@ public sealed class WishesRepository(IMongoDatabase database, IEventsDispatcher 
 
     public Task DeleteAsync(string id, CancellationToken cancellationToken)
     {
-        return BaseDeleteAsync(id, cancellationToken);
+        var wish = new Wish { Id = id, Title= string.Empty, Description= string.Empty, Type=string.Empty, UserId= string.Empty};
+        return BaseDeleteAsync(wish, cancellationToken);
     }
 }
