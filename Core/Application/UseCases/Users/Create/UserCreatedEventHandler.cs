@@ -6,10 +6,12 @@ namespace Application.UseCases.Users.Create;
 
 public class UserCreatedEventHandler(ILogger<UserCreatedEventHandler> logger) : IEventHandler<UserCreatedEvent>
 {
-    public Task Handle(UserCreatedEvent domainEvent, CancellationToken cancellationToken)
+    public Task Handle(UserCreatedEvent createdEvent, CancellationToken cancellationToken)
     {
-        // TODO: Send an email verification link, etc.
-        logger.LogInformation("[UserCreatedEventHandler] User created with ID: {UserId}", domainEvent.User.Id);
+        logger.LogInformation("New user successfully created - UserId: {UserId}, Name: {FullName}", createdEvent.User.Id, $"{createdEvent.User.FirstName} {createdEvent.User.LastName}");
+
+        logger.LogDebug("User creation event processed for {UserId} at {ProcessedAt}", createdEvent.User.Id, DateTime.UtcNow);
+
         return Task.CompletedTask;
     }
 }
