@@ -10,5 +10,5 @@ public interface IRepositoryBase<T> where T : IBaseEntity
     Task<List<T>> BaseFindByConditionAsync(Expression<Func<T, bool>> expression, CancellationToken cancellationToken);
     Task BaseCreateAsync(T entity, CancellationToken cancellationToken);
     Task BaseUpdateAsync(T entity, CancellationToken cancellationToken);
-    Task BaseDeleteAsync(string id, CancellationToken cancellationToken);
+    Task BaseDeleteAsync(T entity, CancellationToken cancellationToken);
 }

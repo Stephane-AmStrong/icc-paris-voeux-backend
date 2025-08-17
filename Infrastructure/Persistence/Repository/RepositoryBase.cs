@@ -128,41 +128,13 @@ public class RepositoryBase<T> : IRepositoryBase<T> where T : IBaseEntity
         return updateTask;
     }
 
-    public async Task BaseDeleteAsync(string id, CancellationToken cancellationToken)
+    public Task BaseDeleteAsync(T entity, CancellationToken cancellationToken)
     {
-        var filter = Builders<T>.Filter.Eq(e => e.Id, id);
+        var filter = Builders<T>.Filter.Eq(e => e.Id, entity.Id);
 
-        var entity = await Collection.Find(filter).FirstOrDefaultAsync(cancellationToken);
+        var deleteTask = Collection.DeleteOneAsync(filter, cancellationToken);
 
-        await Collection.DeleteOneAsync(filter, cancellationToken);
-
-        if (entity is not null) _ = DispatchDomainEventsAsync(entity, cancellationToken);
-    }
-
-    /*
-    public Task BaseDeleteAsync(string id, CancellationToken cancellationToken)
-    {
-        var filter = Builders<T>.Filter.Eq(e => e.Id, id);
-
-        var entityTask = Collection.Find(filter).FirstOrDefaultAsync(cancellationToken);
-        var deleteTask = entityTask.ContinueWith(t =>
-        {
-            var entity = t.Result;
-            if (entity is null) return Task.CompletedTask;
-
-            // Fire-and-forget pour la suppression et le dispatch
-            _ = Collection.DeleteOneAsync(filter, cancellationToken)
-                .ContinueWith(dt =>
-                {
-                    if (dt.IsCompletedSuccessfully)
-                    {
-                        _ = DispatchDomainEventsAsync(entity, cancellationToken);
-                    }
-                    // Optionnel : gestion d'erreur ici si dt.IsFaulted
-                }, cancellationToken);
-
-            return Task.CompletedTask;
-        }, cancellationToken);
+        _ = DispatchDomainEventsAsync(entity, cancellationToken);
 
         return deleteTask;
     }
