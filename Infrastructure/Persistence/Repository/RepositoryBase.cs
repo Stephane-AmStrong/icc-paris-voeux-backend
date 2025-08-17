@@ -39,9 +39,10 @@ public class RepositoryBase<T> : IRepositoryBase<T> where T : IBaseEntity
             var regexFilters = stringProps
                 .Select(p => Builders<T>.Filter.Regex(p.Name, new BsonRegularExpression(queryParameters.SearchTerm, "i")));
 
-            if (regexFilters.Any())
+            IEnumerable<FilterDefinition<T>> filterDefinitions = regexFilters as FilterDefinition<T>[] ?? regexFilters.ToArray();
+            if (filterDefinitions.Any())
             {
-                var textSearchFilter = Builders<T>.Filter.Or(regexFilters);
+                var textSearchFilter = Builders<T>.Filter.Or(filterDefinitions);
                 filters.Add(textSearchFilter);
             }
         }
@@ -165,7 +166,6 @@ public class RepositoryBase<T> : IRepositoryBase<T> where T : IBaseEntity
 
         return deleteTask;
     }
-     */
 
     private SortDefinition<T>? BuildSortDefinition(string? orderByQueryString)
     {
