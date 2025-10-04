@@ -4,7 +4,7 @@ namespace Domain.Entities;
 
 public abstract record BaseEntity : IBaseEntity
 {
-    public abstract string Id { get; set; }
+    public required string Id { get; set; }
 
     private readonly List<IDomainEvent> _domainEvents = [];
 

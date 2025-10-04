@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
-using Domain.Errors;
 using DataTransfertObjects.Enumerations;
 using DataTransfertObjects.QueryParameters;
+using Domain.Errors;
 using WebApi.Models;
 
 namespace WebApi.Middleware;
@@ -113,7 +113,8 @@ internal sealed class ExceptionHandlingMiddleware(ILogger<ExceptionHandlingMiddl
     private static readonly Dictionary<string, (Type EnumType, string FriendlyName)> EnumParameters =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            { nameof(WishQueryParameters.OfType), (typeof(WishType), "wish type") }
+            { nameof(AlertQueryParameters.OfSeverity), (typeof(AlertSeverity), "severity") },
+            { nameof(AlertQueryParameters.OfType), (typeof(AlertType), "alert type") }
         };
 
     private void LogException(Exception e)
@@ -130,7 +131,7 @@ internal sealed class ExceptionHandlingMiddleware(ILogger<ExceptionHandlingMiddl
         }
         else
         {
-            logger.LogError(e, "An unhandled exception Created: {Message}", e.Message);
+            logger.LogError(e, "An unhandled exception occurred: {Message}", e.Message);
         }
     }
 }

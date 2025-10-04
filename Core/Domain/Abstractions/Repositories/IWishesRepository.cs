@@ -12,5 +12,5 @@ public interface IWishesRepository
     Task<Wish?> GetByIdAsync(string id, CancellationToken cancellationToken);
     Task CreateAsync(Wish wish, CancellationToken cancellationToken);
     Task UpdateAsync(Wish wish, CancellationToken cancellationToken);
-    Task DeleteAsync(string id, CancellationToken cancellationToken);
+    Task DeleteAsync(Wish wish, CancellationToken cancellationToken);
 }

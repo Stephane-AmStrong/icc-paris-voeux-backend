@@ -35,11 +35,13 @@ public sealed class UsersRepository(IMongoDatabase database, IEventsDispatcher e
 
     public Task UpdateAsync(User user, CancellationToken cancellationToken)
     {
+        user.Raise(new UserUpdatedEvent(user));
         return BaseUpdateAsync(user, cancellationToken);
     }
 
-    public Task DeleteAsync(string id, CancellationToken cancellationToken)
+    public Task DeleteAsync(User user, CancellationToken cancellationToken)
     {
-        return BaseDeleteAsync(id, cancellationToken);
+        user.Raise(new UserDeletedEvent(user));
+        return BaseDeleteAsync(user, cancellationToken);
     }
 }

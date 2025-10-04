@@ -13,18 +13,20 @@ public static class ConfigurationRegistrationExtension
 
         if (!Directory.Exists(configFolder))
         {
-            Log.Logger.Error("ICCParis startup failed: Configuration directory '{ConfigFolder}' does not exist (check 'Config' in appsettings.json).", configFolder);
+            Log.Logger.Error("Icc startup failed: Configuration directory '{ConfigFolder}' does not exist (check 'Config' in appsettings.json).", configFolder);
             Log.CloseAndFlush();
             throw new InvalidOperationException(
-                $"ICCParis startup failed: Configuration directory '{configFolder}' does not exist (check 'Config' in appsettings.json).");
+                $"Icc startup failed: Configuration directory '{configFolder}' does not exist (check 'Config' in appsettings.json).");
         }
 
         string[] configFiles =
         [
+            "kestrel.json",
             "cors.json",
             "database.json",
             "logging.json",
             "serilog.json",
+            "teams.json"
         ];
 
         foreach (string file in configFiles)

@@ -1,4 +1,3 @@
-using AspNetCore.Swagger.Themes;
 using FluentValidation;
 using Serilog;
 using WebApi.Endpoints;
@@ -7,8 +6,11 @@ using WebApi.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure custom JSON configurations
+builder.Services.AddOpenApiServices();
+
 builder.AddCustomJsonConfigurations();
+
+builder.Services.AddKestrelConfiguration(builder.Configuration);
 
 // Configures Serilog
 builder.Host.UseSerilog((context, services, configuration) => configuration
@@ -18,34 +20,36 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 
 // Add services to the container.
 builder.Services.ConfigureCors(builder.Configuration);
+builder.Services.ConfigureDomainEventHandlers();
+builder.Services.ConfigureFlatConfigurationSync(builder.Configuration);
+builder.Services.ConfigureGlobalExceptionHandling();
+builder.Services.ConfigureHandlers();
 builder.Services.ConfigureJsonOptions();
-builder.Services.ConfigureValidation();
-builder.Services.ConfigureSwagger();
-builder.Services.ConfigureMongoDb(builder.Configuration);
+builder.Services.ConfigureMongoDB(builder.Configuration);
 builder.Services.ConfigureRepositories();
 builder.Services.ConfigureServices();
-builder.Services.ConfigureHandlers();
-builder.Services.ConfigureDomainEventHandlers();
-builder.Services.ConfigureGlobalExceptionHandling();
+builder.Services.ConfigureValidation();
 
 builder.Services.AddHealthChecks();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 var app = builder.Build();
+app.UseOpenApiWithSwagger();
+
 app.MapHealthChecks("/health");
 
 // Configure the HTTP request pipeline.
-app.UseSwagger();
-app.UseSwaggerUI(ModernStyle.Dark);
 
 app.UseCors("CorsPolicy");
 
 app.UseMiddleware<EndpointLoggingMiddleware>();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
+app.MapAlertsEndpoints();
 app.MapUsersEndpoints();
 app.MapWishesEndpoints();
+app.MapServerStatusesEndpoints();
+app.MapServersEndpoints();
 
 app.UseHttpsRedirection();
-
 app.Run();
