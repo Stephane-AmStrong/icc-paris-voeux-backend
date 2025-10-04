@@ -70,10 +70,12 @@ public sealed class WishesService(IWishesRepository wishesRepository, ILogger<Wi
 
     public async Task DeleteAsync(string id, CancellationToken cancellationToken)
     {
-        logger.LogInformation("Deleting wish with ID: {WishId}", id);
+        logger.LogInformation("Deleting user with ID: {UserId}", id);
 
-        await wishesRepository.DeleteAsync(id, cancellationToken);
+        var user = await usersRepository.GetByIdAsync(id, cancellationToken) ?? throw new UserNotFoundException(id);
 
-        logger.LogInformation("Successfully deleted wish with ID: {WishId}", id);
+        await usersRepository.DeleteAsync(user, cancellationToken);
+
+        logger.LogInformation("Successfully deleted user with ID: {UserId}", id);
     }
 }

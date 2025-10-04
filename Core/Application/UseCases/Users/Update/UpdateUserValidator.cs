@@ -28,6 +28,6 @@ public class UpdateUserValidator : AbstractValidator<UpdateUserCommand>
                 var existingUser = await usersRepository.GetByIdAsync(id, cancellationToken);
                 return existingUser is not null;
 
-            }).WithMessage(string.Format(Validation.Messages.FieldAlreadyInUse, nameof(UpdateUserCommand.Id), Validation.Entities.User));
+            }).WithMessage(string.Format(Validation.Messages.FieldAlreadyInUseByAnother, nameof(UpdateUserCommand.Id), Validation.Entities.User));
     }
 }

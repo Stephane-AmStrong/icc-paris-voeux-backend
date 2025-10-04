@@ -124,18 +124,8 @@ public sealed class EventsDispatcher(IServiceProvider serviceProvider, ILogger<E
         {
             var handlers = serviceProvider.GetServices(handlerType);
 
-            // Filtrage cohérent dans tous les cas
-            var filteredHandlers = new List<object>();
-
-            foreach (var handler in handlers)
-            {
-                if (handler is not null)
-                {
-                    filteredHandlers.Add(handler);
-                }
-            }
-
-            return filteredHandlers.ToArray();
+            // Consistent filtering in all cases
+            return handlers.Where(handler => handler is not null).ToArray();
         };
     }
 
@@ -159,14 +149,9 @@ public sealed class EventsDispatcher(IServiceProvider serviceProvider, ILogger<E
                     throw new InvalidOperationException($"Handler method must return Task or ValueTask, got {result.GetType().Name}");
             }
         }
-        catch (Exception ex) when (ShouldContinueAfterException(ex))
+        catch (Exception ex)
         {
             _logger.LogError(ex, "Handler {HandlerType} failed for event {EventType}", handler.GetType().Name, domainEvent.GetType().Name);
         }
-    }
-
-    private static bool ShouldContinueAfterException(Exception ex)
-    {
-        return ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException);
     }
 }

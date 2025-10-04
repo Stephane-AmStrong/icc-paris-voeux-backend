@@ -8,7 +8,7 @@ public record ApiErrorResponse(
 {
     public static ApiErrorResponse ValidationError(IReadOnlyDictionary<string, string[]> errors, string traceId)
         => new(
-            "One or more validation errors Created.",
+            "One or more validation errors occurred.",
             StatusCodes.Status400BadRequest,
             errors,
             traceId);

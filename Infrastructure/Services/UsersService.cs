@@ -77,7 +77,9 @@ public sealed class UsersService(IUsersRepository usersRepository, IWishesReposi
     {
         logger.LogInformation("Deleting user with ID: {UserId}", id);
 
-        await usersRepository.DeleteAsync(id, cancellationToken);
+        var user = await usersRepository.GetByIdAsync(id, cancellationToken) ?? throw new UserNotFoundException(id);
+
+        await usersRepository.DeleteAsync(user, cancellationToken);
 
         logger.LogInformation("Successfully deleted user with ID: {UserId}", id);
     }
